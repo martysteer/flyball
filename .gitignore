@@ -1,0 +1,44 @@
+# --- Secrets & config ---
+.env
+*.env
+/etc/flyball.env
+config.local.toml
+secrets.toml
+*.key
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Flyball runtime artifacts ---
+# Generated images, lineage trees, cached generations, persisted session state
+generations/
+lineage/
+cache/
+*.png
+*.jpg
+*.jpeg
+!docs/**            # keep any images we deliberately put in docs
+session_state.json
+
+# --- Models (if you run a local SD/ComfyUI backend anywhere in-tree) ---
+*.safetensors
+*.ckpt
+*.pt
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

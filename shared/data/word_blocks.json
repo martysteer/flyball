@@ -1,0 +1,60 @@
+{
+  "_comment": "Seed option space for Flyball. theme_specific columns feed the Subject/Context/Style word-channels; gestalt_meta feeds Style sub-options, global modifiers, and the +CON evolution operator. Assembled from the existing Inky Story Builder data and the ChatGPT word-block thread.",
+  "theme_specific": {
+    "cinematic_noir": {
+      "Subject": ["Private Eye", "Silent Dancer", "Street Hustler", "Jazz Singer", "Detective"],
+      "Context": ["Foggy Alley", "Neon Bar", "Rain-Slicked Street", "Motel Room", "Rooftop Edge"],
+      "Style": ["Whispered Name", "Dropped Lighter", "Glint of Steel", "Phone Off Hook", "Final Glance"]
+    },
+    "romantic_dreamlike": {
+      "Subject": ["Stargazer", "Writer", "Painter", "Lover", "Stranger"],
+      "Context": ["Flower Field", "Rainy Window", "Sunset Dock", "Old Café", "Paris Balcony"],
+      "Style": ["Hopeful Longing", "Gentle Ache", "Fleeting Joy", "Blooming Warmth", "Timeless Yearning"]
+    },
+    "moody_introspective": {
+      "Subject": ["Drifter", "Old Soul", "Outsider", "Thinker", "Watcher"],
+      "Context": ["Empty Lot", "Dusty Library", "Forest Path", "Overpass", "Cracked Sidewalk"],
+      "Style": ["Disconnection", "Quiet Melancholy", "Fading Light", "Bitter Calm", "Still Reflection"]
+    },
+    "retro_nostalgic": {
+      "Subject": ["Milkman", "Mod Girl", "Greaser", "Film Star", "War Bride"],
+      "Context": ["1950s Suburb", "60s Diner", "Drive-In", "Red Carpet", "Train Station"],
+      "Style": ["Tin Lunchbox", "Roller Skates", "Jukebox Tune", "Pocket Camera", "Love Letter"]
+    },
+    "gritty_real": {
+      "Subject": ["Torn Hoodie", "Bruised Knuckles", "Tight Grip", "Cracked Smile", "Bent Posture"],
+      "Context": ["Brick Wall", "Chain-Link Fence", "Scuffed Concrete", "Rusted Sign", "Flickering Lamp"],
+      "Style": ["Bike Crash", "Missed Shot", "Siren Echo", "Lost Wallet", "Screamed Name"]
+    }
+  },
+  "gestalt_meta": {
+    "visual_layout": [
+      "Gridded Symmetry", "Leading Lines", "Layered Depth", "Negative Space",
+      "Rule of Thirds", "Center-Focused", "Off-Balance Tilt", "Vignette Framing"
+    ],
+    "contrast_light": [
+      "High Contrast Hard Shadows", "Soft Pastel Glow", "Low-Key Darkness", "Blown Highlights",
+      "Monochrome Muted", "Split Lighting", "Color Gel Pop", "Even Natural Light"
+    ],
+    "framing_type": [
+      "Portrait Tight Crop", "Portrait Environmental", "Portrait Silhouetted Backlight",
+      "Landscape Wide Open Space", "Landscape Vertical Vista", "Landscape Abstract Terrain",
+      "Street Snapshot in Motion", "Street Framed Reaction"
+    ],
+    "historical_period": [
+      "Victorian London", "1920s Jazz Age", "1940s Wartime", "1960s Revolution",
+      "1980s Suburbia", "Ancient Rome", "Post-War Berlin", "Future Dystopia Neo-Tokyo"
+    ],
+    "artistic_genre": [
+      "Impressionist Blur", "Film Noir Shadowplay", "Expressionist Color", "Surrealist Dreamscape",
+      "Pop Art Block Tone", "Baroque Drama", "Minimalist Isolation", "Modernist Displacement"
+    ]
+  },
+  "palette_modifiers": {
+    "_comment": "Global modifiers appended to every prompt to suit the Inky Impression's 7-colour panel. Bold, flat, high-contrast styles dither best.",
+    "recommended": [
+      "bold flat colour", "high contrast", "screenprint poster style",
+      "risograph print", "woodcut", "limited palette", "graphic illustration"
+    ]
+  }
+}
