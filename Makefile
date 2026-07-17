@@ -5,13 +5,12 @@
 VENV := venv
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
-BOOT_CONFIG := /boot/firmware/config.txt
 
 help:
 	@echo "Flyball — make targets:"
 	@echo ""
+	@echo "  make setup-pi     One-time Pi hardware setup (Pimoroni drivers — needs reboot)"
 	@echo "  make setup        Create venv + install runtime deps"
-	@echo "  make setup-pi     One-time Pi hardware setup (SPI, I2C, GPIO — needs reboot)"
 	@echo "  make setup-dev    Create venv + install runtime + dev/test deps"
 	@echo "  make conductor    Run Conductor (Slate authority)"
 	@echo "  make controller   Run Controller (Spark client)"
@@ -21,25 +20,29 @@ help:
 	@echo ""
 
 # One-time Pi hardware setup — run once per Pi, then reboot
-# Mirrors Pimoroni install scripts for Unicorn HAT Mini + Inky Impression
+# Clones and runs official Pimoroni installers for Inky + Unicorn HAT Mini.
+# Handles: SPI, I2C, config.txt overlays, system GPIO packages, Python drivers.
 setup-pi:
 	@if [ "$$(uname -s)" != "Linux" ]; then \
 		echo "setup-pi is for Raspberry Pi only. Skipping on $$(uname -s)."; \
 		exit 0; \
 	fi
-	@echo "Enabling SPI and I2C interfaces..."
-	sudo raspi-config nonint do_spi 0
-	sudo raspi-config nonint do_i2c 0
-	@echo "Adding Inky Impression overlays to $(BOOT_CONFIG)..."
-	@grep -q "^dtoverlay=spi0-0cs" $(BOOT_CONFIG) 2>/dev/null || \
-		echo "dtoverlay=spi0-0cs" | sudo tee -a $(BOOT_CONFIG)
-	@grep -q "^dtoverlay=i2c1$$" $(BOOT_CONFIG) 2>/dev/null || \
-		echo "dtoverlay=i2c1" | sudo tee -a $(BOOT_CONFIG)
-	@echo "Installing system GPIO library..."
-	sudo apt-get update -qq
-	sudo apt-get install -y python3-lgpio
 	@echo ""
-	@echo "✓ Pi hardware setup complete."
+	@echo "=== Installing Pimoroni Inky (Slate display) ==="
+	@echo ""
+	rm -rf /tmp/pimoroni-inky
+	git clone --depth 1 https://github.com/pimoroni/inky /tmp/pimoroni-inky
+	cd /tmp/pimoroni-inky && yes | ./install.sh
+	rm -rf /tmp/pimoroni-inky
+	@echo ""
+	@echo "=== Installing Pimoroni Unicorn HAT Mini (Spark display) ==="
+	@echo ""
+	rm -rf /tmp/pimoroni-unicorn
+	git clone --depth 1 https://github.com/pimoroni/unicornhatmini-python /tmp/pimoroni-unicorn
+	cd /tmp/pimoroni-unicorn && yes | ./install.sh
+	rm -rf /tmp/pimoroni-unicorn
+	@echo ""
+	@echo "✓ Pimoroni drivers installed."
 	@echo "  REBOOT REQUIRED: sudo reboot"
 	@echo "  Then run: make setup"
 
@@ -59,10 +62,6 @@ setup: venv
 	$(PIP) install -r requirements.txt
 	@echo "✓ Setup complete. Run 'make conductor' or 'make controller'"
 	@echo "  (Hardware lib build failures on Mac are expected — hardware detection handles fallback)"
-	@if [ "$$(uname -s)" = "Linux" ] && ! python3 -c "import lgpio" 2>/dev/null; then \
-		echo ""; \
-		echo "⚠ lgpio not found. Run 'make setup-pi' first (one-time Pi hardware setup)."; \
-	fi
 
 setup-dev: venv
 	@echo "Installing dev dependencies..."

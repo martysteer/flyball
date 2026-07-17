@@ -36,7 +36,16 @@ Verify discovery:
 ping -c 3 flyball-slate.local
 ```
 
-## Step 2: Hardware Setup (one-time)
+## Step 2: Clone Repository
+
+**On both Pis:**
+```bash
+cd ~
+git clone https://github.com/YOUR_USERNAME/flyball.git
+cd flyball
+```
+
+## Step 3: Hardware Setup (one-time)
 
 Power off each Pi, seat HAT firmly on all 40 GPIO pins, power on. Then:
 
@@ -46,11 +55,12 @@ cd ~/flyball
 make setup-pi
 ```
 
-This runs the Pimoroni-equivalent hardware setup:
-- Enables **SPI** (required by both Unicorn HAT Mini and Inky Impression)
-- Enables **I2C** (required by Inky Impression EEPROM and Unicorn HAT Mini LED driver)
-- Adds `/boot/firmware/config.txt` overlays for Inky: `dtoverlay=spi0-0cs`, `dtoverlay=i2c1`
-- Installs **python3-lgpio** system package (GPIO pin factory for gpiozero)
+This clones and runs the official Pimoroni install scripts:
+- **Inky** (`pimoroni/inky`): SPI, I2C, config.txt overlays, display driver, examples
+- **Unicorn HAT Mini** (`pimoroni/unicornhatmini-python`): SPI, LED driver, GPIO, examples
+
+Pimoroni handles everything: system packages, `/boot/firmware/config.txt` overlays,
+GPIO libraries (lgpio), Python drivers. Repos are cloned to `/tmp` and cleaned up after.
 
 **Reboot required after `setup-pi`:**
 ```bash
@@ -86,7 +96,7 @@ Expected: device at `0x77` (IS31FL3731 LED driver):
 - Verify SPI/I2C enabled: `sudo raspi-config` > Interface Options
 - Try a different power supply (low voltage causes I2C issues)
 
-## Step 3: Install Dependencies
+## Step 4: Install Flyball Dependencies
 
 **On both Pis:**
 ```bash
@@ -94,17 +104,15 @@ cd ~/flyball
 make setup
 ```
 
-Creates a venv (with `--system-site-packages` for GPIO access) and installs:
+Creates a venv (with `--system-site-packages` to access Pimoroni's drivers) and installs app-level deps:
 - `websockets` — WebSocket client/server
+- `pydantic` — message schema
 - `pillow` — image compositing
 - `pygame` — display mocks (dev/debug)
-- `unicornhatmini` — LED matrix driver
-- `inky` — e-paper driver
-- `gpiozero` — button GPIO (uses system `lgpio` as pin factory)
 
-If setup ends with `lgpio not found`, run `make setup-pi` first.
+Hardware drivers (inky, unicornhatmini, gpiozero, lgpio) come from `make setup-pi`.
 
-## Step 4: Install systemd Services
+## Step 5: Install systemd Services
 
 **On both Pis:**
 ```bash
@@ -123,7 +131,7 @@ sudo systemctl enable --now flyball-spark
 
 Services start automatically on boot with `Restart=always`.
 
-## Step 5: Verify Running
+## Step 6: Verify Running
 
 ```bash
 # On Slate
@@ -230,7 +238,7 @@ Slate must allow TCP 8765: `sudo ufw allow 8765/tcp`
 ### lgpio not found / GPIO errors
 
 ```bash
-make setup-pi   # installs python3-lgpio, enables SPI/I2C
+make setup-pi   # runs Pimoroni installers (SPI, I2C, GPIO, drivers)
 sudo reboot
 make clean
 make setup
