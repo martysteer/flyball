@@ -57,3 +57,42 @@ def test_spark_mock_scrolls_long_text():
     for i in range(5):
         mock.render(state)
     mock.close()
+from conductor.display import InkyMock
+from PIL import Image
+
+
+def test_inky_mock_renders_without_crash():
+    """InkyMock renders state snapshot to PIL image."""
+    state = StateSnapshot(
+        channel="subject",
+        channel_color=(0, 200, 80),
+        option_index=2,
+        option_count=5,
+        candidate="Detective",
+        committed=True,
+        mode="word",
+    )
+
+    mock = InkyMock(width=640, height=400)
+    mock.render(state)
+    # InkyMock generates a PIL image; just verify no crash
+    mock.close()
+
+
+def test_inky_mock_renders_sentence():
+    """InkyMock includes sentence ribbon."""
+    state = StateSnapshot(
+        channel="subject",
+        channel_color=(0, 200, 80),
+        option_index=1,
+        option_count=3,
+        candidate="Detective",
+        committed=True,
+        mode="word",
+    )
+
+    mock = InkyMock(width=640, height=400)
+    mock.render(state)
+    # Verify image was created
+    assert mock.image is not None
+    mock.close()

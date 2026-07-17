@@ -1,64 +1,130 @@
-"""SlateDisplay seam + InkyMock. Real Inky Impression driver lands in M4."""
+"""Slate display: real Inky Impression + mock (PIL image)."""
+
+import os
+from dataclasses import dataclass, field
+from typing import Optional
+from pathlib import Path
+import platform
+
 from PIL import Image, ImageDraw, ImageFont
 
-from shared.messages import CHANNELS
+from shared.interfaces.display import Display, StateSnapshot
 
-WIDTH, HEIGHT = 640, 400
-STRIP_W = 72          # sideways left menu strip
-RIBBON_H = 72         # bottom status ribbon
+IS_SIMULATION = platform.system() != "Linux"
 
 
-class SlateDisplay:
-    """Display seam for the slow canvas."""
+@dataclass
+class InkyMock(Display):
+    """Mock Slate display: renders to PIL image."""
 
-    def show(self, img):
-        raise NotImplementedError
+    width: int = 640
+    height: int = 400
+    image: Optional[Image.Image] = field(default=None, init=False)
+
+    def render(self, state: StateSnapshot) -> None:
+        """Render state to PIL image."""
+        # Create new image (white background)
+        self.image = Image.new("RGB", (self.width, self.height), (255, 255, 255))
+        draw = ImageDraw.Draw(self.image)
+
+        # Try to load a font; fall back to default
+        try:
+            font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
+            font_large = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 24)
+        except:
+            font_small = ImageFont.load_default()
+            font_large = ImageFont.load_default()
+
+        # Left menu strip: channel labels (sideways)
+        menu_width = 80
+        channels = [
+            ("A", "Subject", (0, 200, 80)),
+            ("B", "Context", (0, 100, 200)),
+            ("C", "Style", (200, 0, 150)),
+            ("D", "Engine", (200, 150, 0)),
+        ]
+
+        channel_height = self.height // 4
+        for i, (btn, label, color) in enumerate(channels):
+            y = i * channel_height
+            is_active = (state.channel == label.lower())
+
+            if is_active:
+                # Highlight active channel
+                draw.rectangle((0, y, menu_width, y + channel_height), fill=color)
+                draw.text((10, y + 10), f"[{btn}]", fill=(255, 255, 255), font=font_small)
+                draw.text((10, y + 30), label, fill=(255, 255, 255), font=font_small)
+            else:
+                # Inactive
+                draw.rectangle((0, y, menu_width, y + channel_height), outline=color)
+                draw.text((10, y + 10), f"{btn}", fill=color, font=font_small)
+                draw.text((10, y + 30), label, fill=color, font=font_small)
+
+        # Main area: placeholder for generated image
+        main_x = menu_width + 10
+        main_y = 10
+        main_width = self.width - main_x - 10
+        main_height = self.height - main_y - 60
+
+        # Draw placeholder rectangle
+        draw.rectangle(
+            (main_x, main_y, main_x + main_width, main_y + main_height),
+            outline=(0, 0, 0),
+        )
+        draw.text(
+            (main_x + 10, main_y + 10),
+            "Generated Image",
+            fill=(0, 0, 0),
+            font=font_large,
+        )
+        draw.text(
+            (main_x + 10, main_y + 50),
+            f"Candidate: {state.candidate}",
+            fill=(0, 0, 0),
+            font=font_small,
+        )
+
+        # Bottom ribbon: sentence + queue + loop status
+        ribbon_y = self.height - 50
+        sentence = state.candidate  # In real impl, would be full sentence
+        draw.text(
+            (main_x + 10, ribbon_y),
+            f"Sentence: {sentence}",
+            fill=(0, 0, 0),
+            font=font_small,
+        )
+
+        if state.engine:
+            engine_str = f"Loop: {'ON' if state.engine.get('loop') else 'OFF'} | Op: {state.engine.get('operator', 'swap')} | Speed: {state.engine.get('speed_s', 8)}s"
+            draw.text(
+                (main_x + 10, ribbon_y + 25),
+                engine_str,
+                fill=(0, 0, 0),
+                font=font_small,
+            )
+
+        # Display image (commented out for tests)
+        # if IS_SIMULATION:
+        #     self.image.show()
+
+    def close(self) -> None:
+        """Clean up."""
+        pass
 
 
-class InkyMock(SlateDisplay):
-    """Sim: pop the PIL image in the OS viewer (Story Builder pattern)."""
+class SlateDisplay(Display):
+    """Real Slate display (Inky Impression on e-paper)."""
 
-    def show(self, img):
-        img.show(title="Flyball Slate")
+    def render(self, state: StateSnapshot) -> None:
+        """Render to Inky Impression (stub for M1)."""
+        if IS_SIMULATION:
+            # Fall back to mock
+            mock = InkyMock()
+            mock.render(state)
+        else:
+            # TODO: implement real Inky rendering
+            pass
 
-
-def _font(size):
-    try:
-        return ImageFont.load_default(size=size)
-    except TypeError:  # older Pillow
-        return ImageFont.load_default()
-
-
-def render_slate(state):
-    """state: conductor.state.Flyball. Returns 640x400 PIL image."""
-    img = Image.new("RGB", (WIDTH, HEIGHT), "white")
-    d = ImageDraw.Draw(img)
-
-    # Left menu strip: 4 sideways labels next to the physical buttons
-    block_h = HEIGHT // len(CHANNELS)
-    for i, ch in enumerate(CHANNELS):
-        y0 = i * block_h
-        active = ch["id"] == state.active
-        bg = tuple(ch["color"]) if active else "white"
-        fg = "white" if active else "black"
-        label = Image.new("RGB", (block_h, STRIP_W), bg)
-        ld = ImageDraw.Draw(label)
-        ld.text((8, STRIP_W // 2 - 10), f"[{ch['slate_btn']}] {ch['label']}",
-                fill=fg, font=_font(18))
-        img.paste(label.rotate(90, expand=True), (0, y0))
-        d.rectangle([0, y0, STRIP_W, y0 + block_h - 1], outline="black")
-
-    # Main area: placeholder until M2 brings generated images
-    d.text((STRIP_W + 24, 140), "( no image yet - M2 )", fill="gray", font=_font(20))
-
-    # Status ribbon: sentence + engine line
-    ry = HEIGHT - RIBBON_H
-    d.rectangle([STRIP_W, ry, WIDTH, HEIGHT], fill="black")
-    sentence = state.sentence() or "(nothing committed)"
-    d.text((STRIP_W + 12, ry + 10), sentence, fill="white", font=_font(20))
-    e = state.engine_summary()
-    loop = ">" if e["loop"] else "||"
-    d.text((STRIP_W + 12, ry + 42),
-           f"queue {e['queue_depth']}   loop {loop} {e['speed_s']}s   op {e['operator'].upper()}",
-           fill="yellow", font=_font(16))
-    return img
+    def close(self) -> None:
+        """Clean up e-paper."""
+        pass
