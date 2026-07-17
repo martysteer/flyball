@@ -101,9 +101,14 @@ class SlateDisplay(Display):
 
     def __init__(self):
         if HAS_INKY:
-            self.inky = InkyAuto()
-            self.inky.set_border(self.inky.WHITE)
-            self.mock = None
+            try:
+                self.inky = InkyAuto()
+                self.inky.set_border(self.inky.WHITE)
+                self.mock = None
+            except RuntimeError:
+                # EEPROM not detected, fall back to mock
+                self.inky = None
+                self.mock = InkyMock()
         else:
             self.inky = None
             self.mock = InkyMock()

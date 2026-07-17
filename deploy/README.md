@@ -37,6 +37,71 @@ ping -c 3 flyball-slate.local
 ping -c 3 flyball-spark.local
 ```
 
+## Step 1.5: Enable I2C and Verify Hardware
+
+**On both Pis:**
+
+1. **Enable I2C interface:**
+```bash
+sudo raspi-config
+```
+Navigate to: `Interface Options → I2C → Enable`
+
+Reboot after enabling.
+
+2. **Verify HAT is properly seated:**
+   - Power off the Pi
+   - Ensure HAT is firmly seated on all 40 GPIO pins
+   - No gaps between HAT and Pi header
+   - Power on
+
+3. **Check I2C devices detected:**
+
+**On Slate Pi (Inky Impression):**
+```bash
+sudo i2cdetect -y 1
+```
+
+Expected output should show device at `0x50` (EEPROM):
+```
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: 50 -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+```
+
+**On Spark Pi (Unicorn HAT Mini):**
+```bash
+sudo i2cdetect -y 1
+```
+
+Expected output should show device at `0x77` (IS31FL3731 LED driver):
+```
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- 77
+```
+
+**If devices not detected:**
+- Reseat HAT firmly on GPIO header
+- Check for bent pins
+- Verify I2C is enabled in raspi-config
+- Try a different power supply (low voltage can cause I2C issues)
+
+**Fallback behavior:**
+If hardware detection fails, both apps fall back to pygame mock windows. This allows testing the WebSocket bus and state machine without physical displays. Hardware detection happens at startup in `SlateDisplay` and `SparkDisplay` classes.
+
 ## Step 2: Clone Repository
 
 **On both Pis:**

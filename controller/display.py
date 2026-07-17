@@ -127,11 +127,16 @@ class SparkDisplay(Display):
 
     def __init__(self):
         if HAS_UNICORN:
-            self.hat = UnicornHATMini()
-            self.hat.set_brightness(0.5)
-            self.mock = None
-            self.width = 17
-            self.height = 7
+            try:
+                self.hat = UnicornHATMini()
+                self.hat.set_brightness(0.5)
+                self.mock = None
+                self.width = 17
+                self.height = 7
+            except (RuntimeError, OSError):
+                # Hardware init failed, fall back to mock
+                self.hat = None
+                self.mock = SparkMock()
         else:
             self.hat = None
             self.mock = SparkMock()
