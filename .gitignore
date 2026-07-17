@@ -2,6 +2,7 @@
 .env
 *.env
 /etc/flyball.env
+config.toml
 config.local.toml
 secrets.toml
 *.key
