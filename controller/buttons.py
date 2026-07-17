@@ -124,10 +124,15 @@ class GPIOButtonListener(ButtonListener):
         pins = self.SPARK_PINS if device == "spark" else self.SLATE_PINS
 
         if HAS_GPIO:
-            for name, pin in pins.items():
-                btn = Button(pin, pull_up=True, bounce_time=0.1)
-                btn.when_pressed = lambda n=name: self._on_press(n)
-                self.gpio_buttons[name] = btn
+            try:
+                for name, pin in pins.items():
+                    btn = Button(pin, pull_up=True, bounce_time=0.1)
+                    btn.when_pressed = lambda n=name: self._on_press(n)
+                    self.gpio_buttons[name] = btn
+            except (OSError, RuntimeError, ImportError):
+                # GPIO init failed (missing lgpio/RPi.GPIO or permission issue)
+                self.gpio_buttons.clear()
+                self.fallback = KeyboardListener(device=device, on_exit=on_exit)
         else:
             self.fallback = KeyboardListener(device=device, on_exit=on_exit)
 
