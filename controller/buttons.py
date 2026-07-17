@@ -6,9 +6,13 @@ import tty
 import termios
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
-import platform
 
-IS_SIMULATION = platform.system() != "Linux"
+# Hardware detection
+try:
+    from gpiozero import Button
+    HAS_GPIO = True
+except ImportError:
+    HAS_GPIO = False
 
 
 class ButtonListener(ABC):
@@ -37,11 +41,10 @@ class KeyboardListener(ButtonListener):
         """Initialize. device: 'spark' (a/b/x/y) or 'slate' (a/b/c/d)."""
         self.device = device
         self.handler: Optional[Callable] = None
-        self.on_exit = on_exit  # Called on Ctrl+C or 'q'
+        self.on_exit = on_exit
         self.running = False
         self.thread: Optional[threading.Thread] = None
 
-        # Map keyboard keys to buttons
         if device == "spark":
             self.key_map = {"a": "A", "b": "B", "x": "X", "y": "Y"}
         elif device == "slate":
@@ -71,28 +74,24 @@ class KeyboardListener(ButtonListener):
         """Listen for keyboard input."""
         print(f"KeyboardListener ({self.device}) ready. Press keys: {list(self.key_map.keys())}")
 
-        # Set terminal to cbreak mode (unbuffered but keeps ANSI processing)
         old_settings = None
         try:
             old_settings = termios.tcgetattr(sys.stdin)
             tty.setcbreak(sys.stdin.fileno())
-        except:
-            # If not a TTY (e.g. in tests), fall back to buffered
+        except Exception:
             pass
 
         try:
             while self.running:
                 try:
-                    # Read one character (unbuffered)
                     char = sys.stdin.read(1).lower()
 
-                    # Handle Ctrl+C (raw mode captures it as \x03)
                     if char == "\x03" or char == "q":
                         if char == "\x03":
                             print("\n^C")
                         self.running = False
                         if self.on_exit:
-                            self.on_exit()  # Signal main loop to exit
+                            self.on_exit()
                         break
 
                     if char in self.key_map:
@@ -103,32 +102,55 @@ class KeyboardListener(ButtonListener):
                     print(f"\nKeyboard error: {e}")
                     break
         finally:
-            # Restore terminal settings
             if old_settings:
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                print()  # New line after raw mode
+                print()
 
 
-class GPIOListener(ButtonListener):
-    """GPIO-based button listener (real hardware)."""
+class GPIOButtonListener(ButtonListener):
+    """GPIO button listener with transparent fallback to keyboard."""
 
-    def __init__(self, device: str, pins: dict):
-        """Initialize. pins: {"A": 5, "B": 6, "X": 16, "Y": 24}."""
+    # BCM pins: same physical pins on both devices, different button names
+    SPARK_PINS = {"A": 5, "B": 6, "X": 16, "Y": 24}
+    SLATE_PINS = {"A": 5, "B": 6, "C": 16, "D": 24}
+
+    def __init__(self, device: str = "spark", on_exit: Optional[Callable] = None):
         self.device = device
-        self.pins = pins
+        self.on_exit = on_exit
         self.handler: Optional[Callable] = None
-        self.running = False
+        self.fallback: Optional[KeyboardListener] = None
+        self.gpio_buttons = {}
+
+        pins = self.SPARK_PINS if device == "spark" else self.SLATE_PINS
+
+        if HAS_GPIO:
+            for name, pin in pins.items():
+                btn = Button(pin, pull_up=True, bounce_time=0.1)
+                btn.when_pressed = lambda n=name: self._on_press(n)
+                self.gpio_buttons[name] = btn
+        else:
+            self.fallback = KeyboardListener(device=device, on_exit=on_exit)
+
+    def _on_press(self, btn_name: str) -> None:
+        """Handle GPIO button press."""
+        if self.handler:
+            self.handler(btn_name, "press")
 
     def on(self, handler: Callable[[str, str], None]) -> None:
         """Register handler."""
         self.handler = handler
+        if self.fallback:
+            self.fallback.on(handler)
 
     def start(self) -> None:
-        """Start listening on GPIO (stub for M1)."""
-        self.running = True
-        # TODO: set up gpiozero / gpiod listeners
+        """Start listening."""
+        if self.fallback:
+            self.fallback.start()
+        # GPIO buttons fire via callbacks — no thread needed
 
     def stop(self) -> None:
         """Stop listening."""
-        self.running = False
-        # TODO: cleanup GPIO
+        if self.fallback:
+            self.fallback.stop()
+        for btn in self.gpio_buttons.values():
+            btn.close()
