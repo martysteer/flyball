@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 from pathlib import Path
 import platform
-
-from PIL import Image, ImageDraw, ImageFont
+import tkinter as tk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from shared.interfaces.display import Display, StateSnapshot
 
@@ -15,11 +15,14 @@ IS_SIMULATION = platform.system() != "Linux"
 
 @dataclass
 class InkyMock(Display):
-    """Mock Slate display: renders to PIL image."""
+    """Mock Slate display: renders to PIL image in Tkinter window."""
 
     width: int = 640
     height: int = 400
     image: Optional[Image.Image] = field(default=None, init=False)
+    window: Optional[tk.Tk] = field(default=None, init=False)
+    photo: Optional[ImageTk.PhotoImage] = field(default=None, init=False)
+    label: Optional[tk.Label] = field(default=None, init=False)
 
     def render(self, state: StateSnapshot) -> None:
         """Render state to PIL image."""
@@ -103,13 +106,24 @@ class InkyMock(Display):
                 font=font_small,
             )
 
-        # Display image
+        # Display image in Tkinter window
         if IS_SIMULATION:
-            self.image.show()
+            if self.window is None:
+                # Create window once
+                self.window = tk.Tk()
+                self.window.title("Flyball Slate Mock (Inky Impression)")
+                self.label = tk.Label(self.window)
+                self.label.pack()
+
+            # Update image
+            self.photo = ImageTk.PhotoImage(self.image)
+            self.label.config(image=self.photo)
+            self.window.update()
 
     def close(self) -> None:
         """Clean up."""
-        pass
+        if self.window:
+            self.window.destroy()
 
 
 class SlateDisplay(Display):

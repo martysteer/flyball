@@ -2,6 +2,8 @@
 
 import sys
 import threading
+import tty
+import termios
 from typing import Callable, Optional
 import platform
 
@@ -45,17 +47,33 @@ class KeyboardListener:
         """Listen for keyboard input."""
         print(f"KeyboardListener ({self.device}) ready. Press keys: {list(self.key_map.keys())}")
 
-        while self.running:
-            try:
-                char = sys.stdin.read(1).lower()
+        # Set terminal to raw mode (unbuffered, no echo)
+        old_settings = None
+        try:
+            old_settings = termios.tcgetattr(sys.stdin)
+            tty.setraw(sys.stdin.fileno())
+        except:
+            # If not a TTY (e.g. in tests), fall back to buffered
+            pass
 
-                if char in self.key_map:
-                    btn = self.key_map[char]
-                    if self.handler:
-                        self.handler(btn, "press")
+        try:
+            while self.running:
+                try:
+                    # Read one character (unbuffered)
+                    char = sys.stdin.read(1).lower()
 
-                if char == "q":
-                    self.running = False
-            except Exception as e:
-                print(f"Keyboard error: {e}")
-                break
+                    if char in self.key_map:
+                        btn = self.key_map[char]
+                        if self.handler:
+                            self.handler(btn, "press")
+
+                    if char == "q":
+                        self.running = False
+                except Exception as e:
+                    print(f"\nKeyboard error: {e}")
+                    break
+        finally:
+            # Restore terminal settings
+            if old_settings:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                print()  # New line after raw mode
