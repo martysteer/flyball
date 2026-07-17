@@ -26,6 +26,12 @@ venv:
 
 setup: venv
 	@echo "Installing runtime dependencies..."
+	@if [ "$$(uname -s)" = "Linux" ]; then \
+		if ! command -v swig >/dev/null 2>&1; then \
+			echo "Installing swig (required for lgpio build)..."; \
+			sudo apt-get update -qq && sudo apt-get install -y swig; \
+		fi; \
+	fi
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 	@echo "✓ Setup complete. Run 'make conductor' or 'make controller'"
