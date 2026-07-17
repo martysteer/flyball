@@ -32,7 +32,8 @@ async def main():
         while conductor.server_running:
             # Re-render to process pygame events (keyboard, window close)
             snapshot = StateSnapshot.from_registry(conductor.registry, mode="word")
-            conductor.display.render(snapshot)
+            frame = conductor.image_backend.render_frame(snapshot)
+            conductor.display.render_image(frame)
             await asyncio.sleep(0.05)  # ~20 FPS event processing
 
     except KeyboardInterrupt:
