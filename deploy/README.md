@@ -2,6 +2,30 @@
 
 Deploy Flyball to two Raspberry Pi Zero 2 W boards: one Slate (Inky Impression), one Spark (Unicorn HAT Mini).
 
+## Quick Start (fresh SD card)
+
+```bash
+# Flash Raspberry Pi OS Lite, enable SSH + WiFi, boot, then:
+
+# 1. Set hostname (run on each Pi)
+sudo hostnamectl set-hostname flyball-slate   # or flyball-spark
+sudo reboot
+
+# 2. Clone repo
+cd ~ && git clone https://github.com/YOUR_USERNAME/flyball.git && cd flyball
+
+# 3. Install Pimoroni hardware drivers (one-time, ~5-10 min)
+make setup-pi
+sudo reboot
+
+# 4. Install Flyball app dependencies
+make setup
+
+# 5. Install and enable systemd service
+make install
+sudo systemctl enable --now flyball-slate    # or flyball-spark
+```
+
 ## Prerequisites
 
 **Two Pi Zero 2 W boards:**
