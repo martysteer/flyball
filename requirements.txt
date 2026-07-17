@@ -6,4 +6,5 @@ pygame>=2.5.2
 unicornhatmini>=0.0.1
 inky[rpi]>=1.5.0
 gpiozero>=2.0
-rpi-lgpio>=0.4
+# lgpio pin factory: installed via system package (python3-lgpio) on Pi,
+# accessed through --system-site-packages venv flag

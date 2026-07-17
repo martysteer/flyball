@@ -21,15 +21,21 @@ help:
 venv:
 	@if [ ! -d "$(VENV)" ]; then \
 		echo "Creating venv..."; \
-		python3 -m venv $(VENV); \
+		if [ "$$(uname -s)" = "Linux" ]; then \
+			python3 -m venv --system-site-packages $(VENV); \
+		else \
+			python3 -m venv $(VENV); \
+		fi; \
 	fi
-
-LGPIO_WHEELS := https://github.com/adafruit/lgpio-python-wheels/raw/main/wheels/
 
 setup: venv
 	@echo "Installing runtime dependencies..."
+	@if [ "$$(uname -s)" = "Linux" ]; then \
+		echo "Installing system GPIO library (python3-lgpio)..."; \
+		sudo apt-get update -qq && sudo apt-get install -y python3-lgpio; \
+	fi
 	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements.txt --find-links $(LGPIO_WHEELS)
+	$(PIP) install -r requirements.txt
 	@echo "✓ Setup complete. Run 'make conductor' or 'make controller'"
 	@echo "  (Hardware lib build failures on Mac are expected — hardware detection handles fallback)"
 
