@@ -4,12 +4,11 @@ import asyncio
 import logging
 from typing import Optional
 
-from controller.display import SparkMock, SparkDisplay
-from controller.buttons import KeyboardListener, ButtonListener
+from controller.display import SparkDisplay, HAS_UNICORN
+from controller.buttons import GPIOButtonListener, HAS_GPIO
 from shared.bus_websocket import WebSocketClient
 from shared.messages import HelloMessage, StateMessage, PingMessage, ButtonMessage
 from shared.interfaces.display import StateSnapshot
-from shared.config import IS_SIMULATION
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +19,11 @@ class Controller:
     def __init__(self):
         """Initialize Controller."""
         self.bus = WebSocketClient()
-        self.display = SparkMock() if IS_SIMULATION else SparkDisplay()
-        self.buttons: Optional[ButtonListener] = None
+        self.display = SparkDisplay()
+        self.buttons: Optional[GPIOButtonListener] = None
         self.running = False
         self.current_state: Optional[StateSnapshot] = None
-        self.loop = None  # Store event loop for thread-safe scheduling
+        self.loop = None
         self.heartbeat_task = None
 
         # Register bus handlers
@@ -37,23 +36,21 @@ class Controller:
         """Connect to Conductor and start listening."""
         await self.bus.connect(host, port)
         self.running = True
-        self.loop = asyncio.get_running_loop()  # Capture loop for thread-safe calls
+        self.loop = asyncio.get_running_loop()
 
         # Send hello
         hello = HelloMessage(device="spark", fw="0.1.0")
         await self.bus.send(hello.model_dump())
 
-        # Wire keyboard input
-        if IS_SIMULATION and hasattr(self.display, 'on_key'):
-            # Pygame displays handle keyboard directly
+        # Wire input: pygame keyboard in sim, GPIO on hardware
+        if not HAS_GPIO and hasattr(self.display, 'on_key'):
             self.display.on_key = self._on_key
         else:
-            # Hardware: use GPIO button listener
-            self.buttons = KeyboardListener(device="spark", on_exit=self._on_exit_signal)
+            self.buttons = GPIOButtonListener(device="spark", on_exit=self._on_exit_signal)
             self.buttons.on(self._on_button_event)
             self.buttons.start()
 
-        # Start heartbeat task
+        # Start heartbeat
         self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
     async def shutdown(self) -> None:
@@ -89,14 +86,12 @@ class Controller:
         """Handle incremental state update."""
         if not self.current_state:
             return
-
         if "candidate" in msg:
             self.current_state.candidate = msg["candidate"]
         if "option_index" in msg:
             self.current_state.option_index = msg["option_index"]
         if "committed" in msg:
             self.current_state.committed = msg["committed"]
-
         self.display.render(self.current_state)
 
     def _on_pong(self, msg: dict) -> None:
@@ -104,13 +99,11 @@ class Controller:
         logger.debug("Pong received")
 
     def _on_toast(self, msg: dict) -> None:
-        """Handle toast message (brief flash)."""
+        """Handle toast message."""
         logger.info(f"Toast: {msg.get('text')}")
-        # Could flash LED here
 
     def _on_key(self, char: str) -> None:
         """Handle key press from pygame display."""
-        # Map char to button name
         key_map = {'a': 'A', 'b': 'B', 'x': 'X', 'y': 'Y'}
         if char == 'q':
             self._on_exit_signal()
@@ -136,7 +129,7 @@ class Controller:
         self._schedule(self.bus.send(button_msg.model_dump()))
 
     def _on_exit_signal(self) -> None:
-        """Handle exit signal from button listener (Ctrl+C or q)."""
+        """Handle exit signal."""
         self.running = False
 
     async def _heartbeat_loop(self) -> None:
