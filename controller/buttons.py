@@ -110,7 +110,7 @@ class KeyboardListener(ButtonListener):
 
 
 class GPIOButtonListener(ButtonListener):
-    """GPIO button listener with transparent fallback to keyboard."""
+    """GPIO button listener (gpiozero) with keyboard fallback in sim."""
 
     # BCM pins: same physical pins on both devices, different button names
     SPARK_PINS = {"A": 5, "B": 6, "X": 16, "Y": 24}
@@ -132,11 +132,10 @@ class GPIOButtonListener(ButtonListener):
                     btn.when_pressed = lambda n=name: self._on_press(n)
                     self.gpio_buttons[name] = btn
             except (OSError, RuntimeError, ImportError) as e:
-                # GPIO init failed
                 if not IS_SIMULATION:
                     raise RuntimeError(
-                        "GPIO buttons not available on Pi hardware. "
-                        "Install lgpio: pip install lgpio"
+                        f"GPIO buttons failed: {e}. "
+                        "Ensure lgpio is installed: sudo apt install python3-lgpio"
                     ) from e
                 self.gpio_buttons.clear()
                 self.fallback = KeyboardListener(device=device, on_exit=on_exit)
