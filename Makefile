@@ -1,6 +1,6 @@
 # Flyball — Makefile for local dev + Pi deployment
 
-.PHONY: help setup setup-pi setup-dev venv conductor controller test clean install
+.PHONY: help setup setup-inky setup-unicorn setup-dev venv conductor controller test clean install
 
 VENV := venv
 PYTHON := $(VENV)/bin/python
@@ -9,22 +9,22 @@ PIP := $(VENV)/bin/pip
 help:
 	@echo "Flyball — make targets:"
 	@echo ""
-	@echo "  make setup-pi     One-time Pi hardware setup (Pimoroni drivers — needs reboot)"
-	@echo "  make setup        Create venv + install runtime deps"
-	@echo "  make setup-dev    Create venv + install runtime + dev/test deps"
-	@echo "  make conductor    Run Conductor (Slate authority)"
-	@echo "  make controller   Run Controller (Spark client)"
-	@echo "  make test         Run test suite"
-	@echo "  make clean        Remove venv + pycache"
-	@echo "  make install      Install systemd services (Pi deployment)"
+	@echo "  make setup-inky      One-time Slate Pi setup (Inky Impression drivers)"
+	@echo "  make setup-unicorn   One-time Spark Pi setup (Unicorn HAT Mini drivers)"
+	@echo "  make setup           Create venv + install runtime deps"
+	@echo "  make setup-dev       Create venv + install runtime + dev/test deps"
+	@echo "  make conductor       Run Conductor (Slate authority)"
+	@echo "  make controller      Run Controller (Spark client)"
+	@echo "  make test            Run test suite"
+	@echo "  make clean           Remove venv + pycache"
+	@echo "  make install         Install systemd services (Pi deployment)"
 	@echo ""
 
-# One-time Pi hardware setup — run once per Pi, then reboot
-# Clones and runs official Pimoroni installers for Inky + Unicorn HAT Mini.
-# Handles: SPI, I2C, config.txt overlays, system GPIO packages, Python drivers.
-setup-pi:
+# One-time Slate Pi setup — Inky Impression drivers
+# Run on flyball-slate Pi only. Handles: SPI, I2C, config.txt, GPIO, Python drivers.
+setup-inky:
 	@if [ "$$(uname -s)" != "Linux" ]; then \
-		echo "setup-pi is for Raspberry Pi only. Skipping on $$(uname -s)."; \
+		echo "setup-inky is for Raspberry Pi only. Skipping on $$(uname -s)."; \
 		exit 0; \
 	fi
 	@echo "Caching sudo credentials..."
@@ -36,15 +36,33 @@ setup-pi:
 	git clone --depth 1 https://github.com/pimoroni/inky /tmp/pimoroni-inky
 	cd /tmp/pimoroni-inky && ./install.sh
 	@echo ""
+	@echo "✓ Inky drivers installed."
+	@echo "  REBOOT REQUIRED: sudo reboot"
+	@echo "  Then run: make setup"
+
+# One-time Spark Pi setup — Unicorn HAT Mini drivers
+# Run on flyball-spark Pi only. Handles: SPI, I2C, config.txt, GPIO, Python drivers.
+setup-unicorn:
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "setup-unicorn is for Raspberry Pi only. Skipping on $$(uname -s)."; \
+		exit 0; \
+	fi
+	@echo "Caching sudo credentials..."
+	@sudo -v
+	@echo ""
 	@echo "=== Installing Pimoroni Unicorn HAT Mini (Spark display) ==="
 	@echo ""
 	@rm -rf /tmp/pimoroni-unicorn
 	git clone --depth 1 https://github.com/pimoroni/unicornhatmini-python /tmp/pimoroni-unicorn
 	cd /tmp/pimoroni-unicorn && sudo ./install.sh
 	@echo ""
-	@echo "✓ Pimoroni drivers installed."
+	@echo "✓ Unicorn HAT Mini drivers installed."
 	@echo "  REBOOT REQUIRED: sudo reboot"
 	@echo "  Then run: make setup"
+	@echo ""
+	@echo "⚠️  If you also ran 'make setup-inky' on this Pi, you may need to fix SPI config:"
+	@echo "    Edit /boot/firmware/config.txt and remove 'dtoverlay=spi0-0cs' if present."
+	@echo "    Both HATs need 'dtparam=spi=on' (gives CS0 + CS1). Reboot after editing."
 
 venv:
 	@if [ ! -d "$(VENV)" ]; then \

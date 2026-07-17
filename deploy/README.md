@@ -14,10 +14,15 @@ sudo reboot
 # 2. Clone repo
 cd ~ && git clone https://github.com/YOUR_USERNAME/flyball.git && cd flyball
 
-# 3. Install Pimoroni hardware drivers (one-time)
-make setup-pi
+# 3. Install Pimoroni hardware drivers (one-time, device-specific)
+# On flyball-slate (Inky Impression):
+make setup-inky
+
+# On flyball-spark (Unicorn HAT Mini):
+make setup-unicorn
+
 # When prompted to install examples, press Y — lets you test hardware separately from Flyball
-# Examples install to ~/Pimoroni/inky and ~/Pimoroni/unicornhatmini
+# Examples install to ~/Pimoroni/inky or ~/Pimoroni/unicornhatmini
 sudo reboot
 
 # 4. Install Flyball app dependencies
@@ -78,3 +83,12 @@ export FLYBALL_CONDUCTOR_HOST=<slate-ip>     # override on Spark
 **HAT not detected:** power off, reseat on all 40 GPIO pins, check `sudo i2cdetect -y 1`
 
 **Inky not refreshing:** normal refresh takes ~30-40s. Check logs for render messages.
+
+**Both HATs on same Pi (testing/dev):** If you ran both `make setup-inky` and `make setup-unicorn` on the same Pi, check SPI config:
+```bash
+grep spi /boot/firmware/config.txt
+# Should have: dtparam=spi=on
+# Remove if present: dtoverlay=spi0-0cs (blocks Unicorn HAT Mini)
+# Need both /dev/spidev0.0 (Inky) and /dev/spidev0.1 (Unicorn)
+sudo reboot  # after editing config.txt
+```
