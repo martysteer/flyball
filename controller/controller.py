@@ -25,6 +25,7 @@ class Controller:
         self.running = False
         self.current_state: Optional[StateSnapshot] = None
         self.loop = None  # Store event loop for thread-safe scheduling
+        self.heartbeat_task = None
 
         # Register bus handlers
         self.bus.on("state", self._on_state)
@@ -53,11 +54,17 @@ class Controller:
             self.buttons.start()
 
         # Start heartbeat task
-        asyncio.create_task(self._heartbeat_loop())
+        self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
     async def shutdown(self) -> None:
         """Shut down client."""
         self.running = False
+        if self.heartbeat_task:
+            self.heartbeat_task.cancel()
+            try:
+                await self.heartbeat_task
+            except asyncio.CancelledError:
+                pass
         if self.buttons:
             self.buttons.stop()
         await self.bus.disconnect()
