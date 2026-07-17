@@ -1,0 +1,16 @@
+[Unit]
+Description=Flyball Spark Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/flyball
+ExecStart=/home/pi/flyball/venv/bin/python -m controller
+Restart=always
+RestartSec=10
+Environment="FLYBALL_CONDUCTOR_HOST=flyball-slate.local"
+
+[Install]
+WantedBy=multi-user.target

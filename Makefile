@@ -56,11 +56,13 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	@echo "✓ Clean"
 
-# Pi deployment: copy files + install system-wide or in /opt/flyball
+# Pi deployment: install systemd services (code stays in ~/flyball via git)
 install:
-	@echo "Installing Flyball system-wide..."
-	sudo pip3 install -r requirements.txt
-	sudo mkdir -p /opt/flyball
-	sudo cp -r conductor controller shared /opt/flyball/
-	@echo "✓ Installed to /opt/flyball"
-	@echo "Next: set up systemd services (see deploy/)"
+	@echo "Installing systemd services..."
+	sudo cp deploy/flyball-slate.service /etc/systemd/system/ 2>/dev/null || true
+	sudo cp deploy/flyball-spark.service /etc/systemd/system/ 2>/dev/null || true
+	sudo systemctl daemon-reload
+	@echo ""
+	@echo "Services installed. Enable the appropriate one:"
+	@echo "  sudo systemctl enable --now flyball-slate   # on Slate Pi"
+	@echo "  sudo systemctl enable --now flyball-spark   # on Spark Pi"

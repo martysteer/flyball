@@ -1,0 +1,16 @@
+[Unit]
+Description=Flyball Slate Conductor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/flyball
+ExecStart=/home/pi/flyball/venv/bin/python -m conductor
+Restart=always
+RestartSec=10
+Environment="FLYBALL_CONDUCTOR_HOST=0.0.0.0"
+
+[Install]
+WantedBy=multi-user.target
