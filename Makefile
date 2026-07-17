@@ -27,8 +27,7 @@ venv:
 setup: venv
 	@echo "Installing runtime dependencies..."
 	$(PIP) install --upgrade pip
-	$(PIP) install websockets==12.0 pydantic==2.5.0 pillow==10.1.0 pygame==2.5.2
-	$(PIP) install unicornhatmini inky gpiozero 2>/dev/null || true
+	$(PIP) install -r requirements.txt
 	@echo "✓ Setup complete. Run 'make conductor' or 'make controller'"
 	@echo "  (Hardware lib build failures on Mac are expected — hardware detection handles fallback)"
 
