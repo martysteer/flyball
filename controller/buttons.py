@@ -71,11 +71,11 @@ class KeyboardListener(ButtonListener):
         """Listen for keyboard input."""
         print(f"KeyboardListener ({self.device}) ready. Press keys: {list(self.key_map.keys())}")
 
-        # Set terminal to raw mode (unbuffered, no echo)
+        # Set terminal to cbreak mode (unbuffered but keeps ANSI processing)
         old_settings = None
         try:
             old_settings = termios.tcgetattr(sys.stdin)
-            tty.setraw(sys.stdin.fileno())
+            tty.setcbreak(sys.stdin.fileno())
         except:
             # If not a TTY (e.g. in tests), fall back to buffered
             pass

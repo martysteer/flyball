@@ -50,10 +50,11 @@ Development log of fixes, improvements, and debug sessions.
 
 ---
 
-**ANSI clear screen in raw mode** (this commit)
-- **Problem:** `os.system("clear")` doesn't work in raw terminal mode → garbled display with progressive indentation
-- **Fix:** Use ANSI escape codes directly (`\033[2J\033[H` for clear + home cursor) instead of system call
-- **Files:** `controller/display.py`
+**ANSI clear screen in raw mode** (commits c7dd7cb, 1adc5ed, this commit)
+- **Problem:** `os.system("clear")` doesn't work in raw mode, then `tty.setraw()` disabled ANSI processing → garbled display with progressive indentation
+- **Fix:** Use ANSI escape codes (`\033[2J\033[H`) + switch to `tty.setcbreak()` instead of `setraw()`
+- **Why:** `setcbreak()` gives unbuffered input but keeps ANSI processing active; `setraw()` disables all terminal processing
+- **Files:** `controller/display.py`, `controller/buttons.py`, `conductor/buttons.py`
 
 **Ctrl+C exit not working** (commit c7dd7cb + this commit)
 - **Problem:** Raw mode captures Ctrl+C as `\x03` char, doesn't raise KeyboardInterrupt. First fix only stopped button thread, main loop kept running.
