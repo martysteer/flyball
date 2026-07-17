@@ -1,57 +1,38 @@
-"""Controller (Spark role): thin client. Renders state, emits buttons.
+"""Controller (Spark) entry point."""
 
-Holds no authoritative state — only scroll/flash animation (docs/03).
-"""
 import asyncio
 import logging
-import os
+import sys
 
-from controller.display import SparkMock
-from shared import messages
-from shared.bus import ClientBus
-from shared.buttons import KeyboardButtons
+from controller.controller import Controller
+from shared.config import get_conductor_host, get_conductor_port, IS_SIMULATION
 
-logging.basicConfig(level=logging.WARNING)  # keep the matrix clean
-log = logging.getLogger("controller")
-
-KEYMAP = {"a": "A", "b": "B", "x": "X", "y": "Y"}
-FPS = 12
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 async def main():
-    host = os.environ.get("FLYBALL_CONDUCTOR_HOST", "localhost")
-    port = os.environ.get("FLYBALL_PORT", "8765")
-    bus = ClientBus(f"ws://{host}:{port}")
-    spark = SparkMock()
+    """Run Controller client."""
+    host = get_conductor_host()
+    port = get_conductor_port()
 
-    async def on_connect():
-        await bus.send(messages.hello())
-
-    async def on_state(msg):
-        spark.set_state(msg)
-
-    async def on_pong(msg):
-        pass
-
-    bus.on_connect = on_connect
-    bus.on("state", on_state)
-    bus.on("pong", on_pong)
-
-    async def on_button(btn):
-        await bus.send(messages.button(btn))
-
-    kb = KeyboardButtons(KEYMAP, on_button)
-
-    async def render():
-        while True:
-            spark.tick()
-            await asyncio.sleep(1 / FPS)
+    controller = Controller()
 
     try:
-        await asyncio.gather(bus.run(), kb.run(), render())
+        logger.info(f"Connecting to Conductor at {host}:{port}...")
+        await controller.connect(host, port)
+
+        # Keep running
+        while controller.running:
+            await asyncio.sleep(0.1)
+
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
     finally:
-        print("\x1b[?25h\x1b[0m")  # restore cursor
+        await controller.shutdown()
 
 
 if __name__ == "__main__":
+    if IS_SIMULATION:
+        logger.info("Running in SIMULATION mode")
     asyncio.run(main())
