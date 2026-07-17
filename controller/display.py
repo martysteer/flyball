@@ -1,131 +1,143 @@
-"""Spark display: real Unicorn HAT Mini + mock (ANSI terminal 17×7)."""
+"""Spark display: real Unicorn HAT Mini + pygame mock."""
 
-import os
-import sys
+import platform
 from dataclasses import dataclass
 from typing import Optional
-import platform
 
 from shared.interfaces.display import Display, StateSnapshot
 
 IS_SIMULATION = platform.system() != "Linux"
 
-# ANSI colour codes
-ANSI_BLACK = "\033[40m"
-ANSI_RED = "\033[41m"
-ANSI_GREEN = "\033[42m"
-ANSI_YELLOW = "\033[43m"
-ANSI_BLUE = "\033[44m"
-ANSI_MAGENTA = "\033[45m"
-ANSI_CYAN = "\033[46m"
-ANSI_WHITE = "\033[47m"
-ANSI_RESET = "\033[0m"
-ANSI_BRIGHT = "\033[1m"
-
-# Map RGB to ANSI colour (naive)
-def rgb_to_ansi(rgb: tuple) -> str:
-    """Convert (r, g, b) to closest ANSI colour."""
-    r, g, b = rgb
-    if r > 100 and g > 100 and b > 100:
-        return ANSI_WHITE
-    elif r > 150 and g < 100 and b < 100:
-        return ANSI_RED
-    elif g > 150 and r < 100 and b < 100:
-        return ANSI_GREEN
-    elif b > 150 and r < 100 and g < 100:
-        return ANSI_BLUE
-    elif r > 150 and g > 100 and b < 100:
-        return ANSI_YELLOW
-    elif r > 150 and b > 100 and g < 100:
-        return ANSI_MAGENTA
-    elif g > 100 and b > 100 and r < 100:
-        return ANSI_CYAN
-    else:
-        return ANSI_BLACK
-
 
 @dataclass
 class SparkMock(Display):
-    """Mock Spark display: renders 17×7 ANSI matrix to terminal."""
+    """Mock Spark display: pygame window showing 17×7 LED matrix."""
 
     width: int = 17
     height: int = 7
-    scroll_pos: int = 0  # For scrolling text
+    unicorn: Optional[object] = None
+    scroll_pos: int = 0
+
+    def __post_init__(self):
+        """Initialize pygame unicorn mock."""
+        if IS_SIMULATION:
+            from controller.unicorn_mock import UnicornHATMiniBase
+            self.unicorn = UnicornHATMiniBase()
+            self.unicorn.set_brightness(0.5)
 
     def render(self, state: StateSnapshot) -> None:
-        """Render state to terminal."""
-        # Build 17×7 matrix
-        matrix = [[" " for _ in range(self.width)] for _ in range(self.height)]
+        """Render state to pygame window."""
+        if not self.unicorn:
+            return
 
-        color = rgb_to_ansi(state.channel_color)
+        # Clear display
+        self.unicorn.clear()
 
-        # Row 0: colour bar (full width, dim)
+        # Map channel color
+        r, g, b = state.channel_color
+
+        # Row 0: color bar (full width)
         for x in range(self.width):
-            matrix[0][x] = "▄"  # Half-block
+            self.unicorn.set_pixel(x, 0, r//4, g//4, b//4)  # Dim
 
         # Row 1: position pips
-        pip_char = "●"  # Bright dot at current index
-        dim_pip = "○"   # Dim dots for others
         if state.option_count > 0:
             for i in range(min(state.option_count, self.width)):
-                matrix[1][i] = pip_char if i == state.option_index else dim_pip
+                if i == state.option_index:
+                    # Bright pip at current position
+                    self.unicorn.set_pixel(i, 1, r, g, b)
+                else:
+                    # Dim pip
+                    self.unicorn.set_pixel(i, 1, r//8, g//8, b//8)
 
-        # Rows 2–6: text (two-line layout: rows 2–4, gap, rows 6)
-        # For now: rows 2–4 = line 1, row 5 = spacer, row 6 = line 2
-        text_to_render = state.candidate
+        # Rows 2-6: scrolling text (5 rows = ~3px font height)
+        text = state.candidate
 
-        if state.mode == "engine":
-            # Engine channel: show operator icon + setting
-            text_line_1 = f"[{state.engine['operator'].upper()}]"
-            text_line_2 = f"Speed: {state.engine['speed_s']}s"
-        else:
-            # Word channel: scroll text
-            # Simple scrolling: use scroll_pos to advance
-            text_with_padding = text_to_render + "  " + text_to_render
-            text_line_1 = text_with_padding[self.scroll_pos:self.scroll_pos + 17]
-            text_line_2 = ""  # Second line can be empty or show more info
-            self.scroll_pos = (self.scroll_pos + 1) % len(text_with_padding)
+        if state.mode == "engine" and state.engine:
+            # Engine mode: show operator
+            text = f"[{state.engine['operator'].upper()}]"
 
-        # Render lines to matrix
-        # Line 1: rows 2–4 (but fit into a 3-row height)
-        for i, ch in enumerate(text_line_1[:17]):
-            matrix[2][i] = ch
+        # Simple pixel text rendering
+        self._render_text(text, r, g, b)
 
-        # Line 2: row 6
-        if text_line_2:
-            for i, ch in enumerate(text_line_2[:17]):
-                matrix[6][i] = ch
+        # Update display
+        self.unicorn.show()
 
-        # Render to terminal (use ANSI codes, not os.system which breaks in raw mode)
-        sys.stdout.write(f"\033[2J\033[H")  # Clear screen + cursor home
-        sys.stdout.flush()
-        print(f"\n{color}Spark 17×7 Mock — Channel: {state.channel.upper()}{ANSI_RESET}\n")
+    def _render_text(self, text: str, r: int, g: int, b: int) -> None:
+        """Render scrolling text on rows 2-6."""
+        # 3x5 pixel font (very basic)
+        font_3x5 = {
+            'A': [[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+            'B': [[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,1,0]],
+            'C': [[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],
+            'D': [[1,1,0],[1,0,1],[1,0,1],[1,0,1],[1,1,0]],
+            'E': [[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,1,1]],
+            'F': [[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,0,0]],
+            'G': [[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],
+            'H': [[1,0,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+            'I': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],
+            'J': [[0,0,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
+            'K': [[1,0,1],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+            'L': [[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],
+            'M': [[1,0,1],[1,1,1],[1,0,1],[1,0,1],[1,0,1]],
+            'N': [[1,0,1],[1,1,1],[1,0,1],[1,0,1],[1,0,1]],
+            'O': [[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+            'P': [[1,1,0],[1,0,1],[1,1,0],[1,0,0],[1,0,0]],
+            'R': [[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+            'S': [[0,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]],
+            'T': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
+            'U': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+            'V': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+            'W': [[1,0,1],[1,0,1],[1,0,1],[1,1,1],[1,0,1]],
+            'X': [[1,0,1],[1,0,1],[0,1,0],[1,0,1],[1,0,1]],
+            'Y': [[1,0,1],[1,0,1],[0,1,0],[0,1,0],[0,1,0]],
+            ' ': [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
+            '[': [[1,1,0],[1,0,0],[1,0,0],[1,0,0],[1,1,0]],
+            ']': [[0,1,1],[0,0,1],[0,0,1],[0,0,1],[0,1,1]],
+        }
 
-        # Print matrix
-        for row in matrix:
-            row_str = "".join(row)
-            print(f"  {color}█{ANSI_RESET} {row_str} {color}█{ANSI_RESET}")
+        # Scroll text
+        text_upper = text.upper()
+        x_offset = 0
 
-        print()
+        for char in text_upper[:6]:  # Max ~6 chars visible
+            if char in font_3x5:
+                glyph = font_3x5[char]
+                for dy, row in enumerate(glyph):
+                    for dx, pixel in enumerate(row):
+                        x = x_offset + dx
+                        y = 2 + dy  # Start at row 2
+                        if pixel and 0 <= x < self.width and 0 <= y < self.height:
+                            self.unicorn.set_pixel(x, y, r, g, b)
+                x_offset += 4  # 3px char + 1px space
 
     def close(self) -> None:
-        """Clean up."""
-        pass
+        """Clean up pygame."""
+        if self.unicorn:
+            self.unicorn.clear()
+            self.unicorn.show()
 
 
 class SparkDisplay(Display):
     """Real Spark display (Unicorn HAT Mini on GPIO)."""
 
-    def render(self, state: StateSnapshot) -> None:
-        """Render to Unicorn HAT Mini (stub for M1)."""
+    def __init__(self):
+        """Initialize display."""
         if IS_SIMULATION:
-            # Fall back to mock
-            mock = SparkMock()
-            mock.render(state)
+            # Use pygame mock
+            self.impl = SparkMock()
         else:
-            # TODO: implement real Unicorn HAT rendering
+            # TODO: Use real unicornhatmini library
+            # from unicornhatmini import UnicornHATMini
+            # self.impl = ...
             pass
 
+    def render(self, state: StateSnapshot) -> None:
+        """Render to display."""
+        if hasattr(self, 'impl'):
+            self.impl.render(state)
+
     def close(self) -> None:
-        """Clean up GPIO."""
-        pass
+        """Clean up."""
+        if hasattr(self, 'impl'):
+            self.impl.close()

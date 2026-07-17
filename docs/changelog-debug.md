@@ -119,6 +119,18 @@ make controller             # Terminal 2
 
 ---
 
+**Pygame Unicorn HAT Mini mock** (this commit)
+- **Problem:** ANSI terminal mock limited, hard to debug, doesn't match hardware feel
+- **Solution:** Integrated existing pygame-based Unicorn HAT Mini emulator
+- **Features:**
+  - Visual 17×7 LED matrix window (15x pixel scale)
+  - Proper color rendering with brightness control
+  - 3×5 pixel font for text display
+  - Button state indicators (A/B/X/Y)
+  - Matches real hardware API: set_pixel, set_brightness, clear, show
+- **Files:** `controller/unicorn_mock.py` (copied from unicorn-pi), `controller/display.py` (rewritten), `requirements-dev.txt` (+pygame)
+- **Source:** Adapted from `/Users/marty/Devel/unicorn-pi/proxyunicornhatmini.py`
+
 ## Next Steps (M2)
 
 1. Add ImageBackend implementation (stub → real API)
