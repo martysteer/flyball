@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import pytest
 from shared.keymap import Keymap, normalize_action
+from conductor.conductor import Conductor
 
 
 @pytest.fixture
@@ -88,3 +89,18 @@ def test_all_actions_slate(slate_keymap):
     """all_actions collects every action name from slate keymap."""
     actions = slate_keymap.all_actions()
     assert actions == {"channel"}
+
+
+@pytest.fixture
+def word_blocks_path():
+    return Path(__file__).parent.parent / "shared" / "data" / "word_blocks.json"
+
+
+def test_all_keymap_actions_have_handlers(word_blocks_path, keymaps_dir):
+    """Every action in every keymap JSON must have a handler in Conductor.actions."""
+    conductor = Conductor(word_blocks_path)
+    for keymap_file in keymaps_dir.glob("*.json"):
+        keymap = Keymap.load(keymap_file)
+        for action_name in keymap.all_actions():
+            assert action_name in conductor.actions, \
+                f"{keymap_file.name}: action '{action_name}' has no handler in Conductor"
