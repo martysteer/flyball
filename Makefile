@@ -37,7 +37,7 @@ setup-pi:
 	else \
 		echo "$$HOME/inky already exists, skipping clone"; \
 	fi
-	cd $$HOME/inky && yes y | ./install.sh
+	cd $$HOME/inky && ./install.sh
 	@echo ""
 	@echo "=== Installing Pimoroni Unicorn HAT Mini (Spark display) ==="
 	@echo ""
@@ -46,7 +46,7 @@ setup-pi:
 	else \
 		echo "$$HOME/unicornhatmini-python already exists, skipping clone"; \
 	fi
-	cd $$HOME/unicornhatmini-python && yes y | sudo ./install.sh
+	cd $$HOME/unicornhatmini-python && sudo ./install.sh
 	@echo ""
 	@echo "✓ Pimoroni drivers installed."
 	@echo "  REBOOT REQUIRED: sudo reboot"
