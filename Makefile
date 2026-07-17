@@ -27,6 +27,9 @@ setup-pi:
 		echo "setup-pi is for Raspberry Pi only. Skipping on $$(uname -s)."; \
 		exit 0; \
 	fi
+	@echo "Caching sudo credentials..."
+	@sudo -v
+	@echo ""
 	@echo "=== Installing Pimoroni Inky (Slate display) ==="
 	@echo ""
 	@if [ ! -d "$$HOME/inky" ]; then \
@@ -34,7 +37,7 @@ setup-pi:
 	else \
 		echo "$$HOME/inky already exists, skipping clone"; \
 	fi
-	cd $$HOME/inky && sudo ./install.sh
+	cd $$HOME/inky && yes y | ./install.sh
 	@echo ""
 	@echo "=== Installing Pimoroni Unicorn HAT Mini (Spark display) ==="
 	@echo ""
@@ -43,7 +46,7 @@ setup-pi:
 	else \
 		echo "$$HOME/unicornhatmini-python already exists, skipping clone"; \
 	fi
-	cd $$HOME/unicornhatmini-python && sudo ./install.sh
+	cd $$HOME/unicornhatmini-python && yes y | ./install.sh
 	@echo ""
 	@echo "✓ Pimoroni drivers installed."
 	@echo "  REBOOT REQUIRED: sudo reboot"
