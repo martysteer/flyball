@@ -23,6 +23,7 @@ class Conductor:
         self.registry = ChannelRegistry(word_blocks_path)
         self.bus = WebSocketServer()
         self.display = InkyMock() if IS_SIMULATION else SlateDisplay()
+        self.loop = None  # Store event loop for thread-safe scheduling
 
         # Slate button listener (sim)
         self.buttons: Optional[KeyboardListener] = None
@@ -37,6 +38,7 @@ class Conductor:
 
     async def start(self, host: str, port: int) -> None:
         """Start WebSocket server and display."""
+        self.loop = asyncio.get_running_loop()  # Capture loop for thread-safe calls
         await self.bus.start(host, port)
 
     async def shutdown(self) -> None:
@@ -102,7 +104,12 @@ class Conductor:
             mode=snapshot.mode,
             engine=snapshot.engine,
         )
-        asyncio.create_task(self.bus.send(msg.model_dump()))
+        # Send message (thread-safe)
+        if self.loop:
+            asyncio.run_coroutine_threadsafe(
+                self.bus.send(msg.model_dump()),
+                self.loop
+            )
 
         # Also render to Slate display
         self.display.render(snapshot)

@@ -24,6 +24,7 @@ class Controller:
         self.buttons: Optional[ButtonListener] = None
         self.running = False
         self.current_state: Optional[StateSnapshot] = None
+        self.loop = None  # Store event loop for thread-safe scheduling
 
         # Register bus handlers
         self.bus.on("state", self._on_state)
@@ -35,6 +36,7 @@ class Controller:
         """Connect to Conductor and start listening."""
         await self.bus.connect(host, port)
         self.running = True
+        self.loop = asyncio.get_running_loop()  # Capture loop for thread-safe calls
 
         # Send hello
         hello = HelloMessage(device="spark", fw="0.1.0")
@@ -98,9 +100,13 @@ class Controller:
         """Handle button press from keyboard."""
         logger.info(f"Button event: {btn} {event}")
 
-        # Send to Conductor
+        # Send to Conductor (thread-safe)
         button_msg = ButtonMessage(btn=btn, event=event)
-        asyncio.create_task(self.bus.send(button_msg.model_dump()))
+        if self.loop:
+            asyncio.run_coroutine_threadsafe(
+                self.bus.send(button_msg.model_dump()),
+                self.loop
+            )
 
     async def _heartbeat_loop(self) -> None:
         """Send periodic ping to Conductor."""
