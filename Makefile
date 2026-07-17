@@ -21,16 +21,18 @@ help:
 venv:
 	@if [ ! -d "$(VENV)" ]; then \
 		echo "Creating venv..."; \
-		python3 -m venv $(VENV); \
+		if [ "$$(uname -s)" = "Linux" ]; then \
+			python3 -m venv --system-site-packages $(VENV); \
+		else \
+			python3 -m venv $(VENV); \
+		fi; \
 	fi
 
 setup: venv
 	@echo "Installing runtime dependencies..."
 	@if [ "$$(uname -s)" = "Linux" ]; then \
-		if ! command -v swig >/dev/null 2>&1; then \
-			echo "Installing swig (required for lgpio build)..."; \
-			sudo apt-get update -qq && sudo apt-get install -y swig; \
-		fi; \
+		echo "Installing system GPIO libraries..."; \
+		sudo apt-get update -qq && sudo apt-get install -y python3-lgpio python3-rpi.gpio 2>/dev/null || true; \
 	fi
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
