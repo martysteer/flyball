@@ -28,6 +28,8 @@ async def main():
             # Re-render to process pygame events (keyboard, window close)
             if controller.current_state:
                 controller.display.render(controller.current_state)
+            elif hasattr(controller.display, 'mock') and controller.display.mock:
+                controller.display.mock.unicorn.show()  # pump events before first state
             await asyncio.sleep(0.05)  # ~20 FPS event processing
 
     except KeyboardInterrupt:
