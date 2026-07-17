@@ -103,9 +103,9 @@ class InkyMock(Display):
                 font=font_small,
             )
 
-        # Display image (commented out for tests)
-        # if IS_SIMULATION:
-        #     self.image.show()
+        # Display image
+        if IS_SIMULATION:
+            self.image.show()
 
     def close(self) -> None:
         """Clean up."""
