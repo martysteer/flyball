@@ -24,6 +24,12 @@ The interaction is **modifier + jog wheel**: Slate buttons pick *which channel* 
 ## Build order
 Follow `docs/05-roadmap.md`: M0 bus → M1 state machine + channels → M2 image gen + queue → M3 evolution loop → M4 hardware → M5 boot/resilience. Each milestone is demoable in sim.
 
+## Documentation
+- `docs/` — all docs live here (design docs `01`–`05`, setup, changelog, summaries).
+- `docs/plans/` — implementation plans. Date-prefixed: `YYYY-MM-DD-<name>.md`.
+- `docs/specs/` — specs and brainstorm outputs. Date-prefixed: `YYYY-MM-DD-<name>.md`.
+- No `superpowers/` subdir — plans and specs go directly in the dirs above.
+
 ## Conventions
 - Python 3. Transport is WebSocket + JSON (see `docs/03` for the message schema). Conductor interprets button *semantics* (Spark just reports "B pressed").
 - Config + secrets via env/`config.toml`, never hardcoded. Image-gen key comes from the environment.
