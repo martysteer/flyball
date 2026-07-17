@@ -1,5 +1,6 @@
 """Spark display: real Unicorn HAT Mini + pygame mock."""
 
+from shared.config import IS_SIMULATION
 from shared.interfaces.display import Display, StateSnapshot
 
 # Hardware detection
@@ -133,11 +134,18 @@ class SparkDisplay(Display):
                 self.mock = None
                 self.width = 17
                 self.height = 7
-            except (RuntimeError, OSError):
-                # Hardware init failed, fall back to mock
+            except (RuntimeError, OSError) as e:
+                # Hardware init failed
+                if not IS_SIMULATION:
+                    raise RuntimeError(
+                        "Unicorn HAT Mini not detected on Pi hardware. "
+                        "Check I2C enabled and HAT seated properly."
+                    ) from e
                 self.hat = None
                 self.mock = SparkMock()
         else:
+            if not IS_SIMULATION:
+                raise ImportError("Unicorn HAT Mini library not available on Pi hardware")
             self.hat = None
             self.mock = SparkMock()
 

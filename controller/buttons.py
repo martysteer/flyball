@@ -7,6 +7,8 @@ import termios
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
+from shared.config import IS_SIMULATION
+
 # Hardware detection
 try:
     from gpiozero import Button
@@ -129,11 +131,18 @@ class GPIOButtonListener(ButtonListener):
                     btn = Button(pin, pull_up=True, bounce_time=0.1)
                     btn.when_pressed = lambda n=name: self._on_press(n)
                     self.gpio_buttons[name] = btn
-            except (OSError, RuntimeError, ImportError):
-                # GPIO init failed (missing lgpio/RPi.GPIO or permission issue)
+            except (OSError, RuntimeError, ImportError) as e:
+                # GPIO init failed
+                if not IS_SIMULATION:
+                    raise RuntimeError(
+                        "GPIO buttons not available on Pi hardware. "
+                        "Install lgpio: pip install lgpio"
+                    ) from e
                 self.gpio_buttons.clear()
                 self.fallback = KeyboardListener(device=device, on_exit=on_exit)
         else:
+            if not IS_SIMULATION:
+                raise ImportError("gpiozero not available on Pi hardware")
             self.fallback = KeyboardListener(device=device, on_exit=on_exit)
 
     def _on_press(self, btn_name: str) -> None:

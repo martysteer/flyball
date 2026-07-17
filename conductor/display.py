@@ -2,6 +2,7 @@
 
 from PIL import Image
 
+from shared.config import IS_SIMULATION
 from shared.interfaces.display import Display, StateSnapshot
 
 # Hardware detection
@@ -105,11 +106,18 @@ class SlateDisplay(Display):
                 self.inky = InkyAuto()
                 self.inky.set_border(self.inky.WHITE)
                 self.mock = None
-            except RuntimeError:
-                # EEPROM not detected, fall back to mock
+            except RuntimeError as e:
+                # EEPROM not detected
+                if not IS_SIMULATION:
+                    raise RuntimeError(
+                        "Inky HAT not detected on Pi hardware. "
+                        "Check I2C enabled and HAT seated properly."
+                    ) from e
                 self.inky = None
                 self.mock = InkyMock()
         else:
+            if not IS_SIMULATION:
+                raise ImportError("Inky library not available on Pi hardware")
             self.inky = None
             self.mock = InkyMock()
 
