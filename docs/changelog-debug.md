@@ -4,6 +4,86 @@ Development log of fixes, improvements, and debug sessions.
 
 ---
 
+## 2026-07-17 — M4 Hardware Bring-Up
+
+### Implementation
+
+**BasicImageBackend** (commit e570f62–9380e0c)
+- Extracted PIL compositing from InkyMock into standalone `BasicImageBackend`
+- `render_frame(StateSnapshot) -> PIL.Image` — produces 640x400 frame with menu strip + sentence ribbon
+- Both `SlateDisplay` and `InkyMock` now receive a PIL Image via `render_image()`
+
+**SparkDisplay** (commit e570f62)
+- Hardware detection: tries `from unicornhatmini import UnicornHATMini`
+- Real hardware: `set_pixel`/`show` on Unicorn HAT Mini, 3x5 font rendering
+- Falls back to `SparkMock` (pygame) on Mac/Linux, exits on Pi if HAT not detected
+
+**SlateDisplay** (commit 9380e0c)
+- Hardware detection: tries `from inky.auto import auto`
+- Real hardware: `InkyAuto()` with `set_image`/`show`
+- Falls back to `InkyMock` (pygame) on Mac/Linux, exits on Pi if HAT not detected
+
+**GPIOButtonListener** (commit 91ca423)
+- Uses `gpiozero.Button` for BCM 5/6/16/24
+- Falls back to `KeyboardListener` on Mac/Linux, exits on Pi if GPIO unavailable
+- Same physical pins on both HATs, different button names (A/B/X/Y vs A/B/C/D)
+
+**Conductor + Controller wiring** (commits 32dd5e6, 1d6a2a7)
+- Conductor: `BasicImageBackend` + `SlateDisplay` + `GPIOButtonListener`
+- Controller: `SparkDisplay` + `GPIOButtonListener`
+- Render loop: `image_backend.render_frame(snapshot)` → `display.render_image(frame)`
+
+**Systemd + Makefile** (commit 6899024)
+- `flyball-slate.service` — runs conductor, binds `0.0.0.0:8765`
+- `flyball-spark.service` — runs controller, connects to `flyball-slate.local:8765`
+- `make install` — copies service files, reloads systemd
+
+### Pi Deployment Fixes
+
+**Python 3.13 compatibility** (commit 3315d03)
+- Pillow 10.1.0 doesn't build on Python 3.13 (KeyError in setup.py)
+- Switched requirements.txt from `==` pins to `>=` — Pillow 12.3.0, Pydantic 2.13.4 install fine
+- Makefile uses `pip install -r requirements.txt` instead of duplicating version pins
+
+**Hardware detection fallbacks** (commit cced90c)
+- `SlateDisplay.__init__` catches `RuntimeError` from `InkyAuto()` when EEPROM not detected
+- `SparkDisplay.__init__` catches `RuntimeError`/`OSError` from `UnicornHATMini()`
+- On Pi hardware (`IS_SIMULATION=False`), raises with clear error instead of silent mock fallback
+
+**mDNS hostname** (commit 58432f5)
+- Default conductor host was `slate.local`, should be `flyball-slate.local`
+- Fixed `get_conductor_host()` in `shared/config.py`
+
+**GPIO library saga** (commits b3913ae–8a9f3db)
+- **Problem:** gpiozero needs a pin factory backend (lgpio, RPi.GPIO, or pigpio). None available for Python 3.13 in venv.
+- **Attempted:** pip install lgpio (needs liblgpio C lib + swig to build), rpi-lgpio (needs lgpio), adafruit pre-built wheels (invalid platform tag rejected by pip)
+- **Solution:** `make setup-pi` installs `python3-lgpio` from apt (system package with C bindings). Venv created with `--system-site-packages` so gpiozero finds lgpio.
+- Mirrors Pimoroni install scripts: enables SPI, I2C, adds config.txt overlays
+
+**setup-pi Makefile target** (commit 8a9f3db)
+- One-time Pi hardware setup, requires reboot after
+- `raspi-config nonint do_spi 0` — SPI for both HATs
+- `raspi-config nonint do_i2c 0` — I2C for Inky EEPROM + Unicorn LED driver
+- Adds `/boot/firmware/config.txt` overlays: `dtoverlay=spi0-0cs`, `dtoverlay=i2c1`
+- `apt install python3-lgpio` — GPIO pin factory for gpiozero
+- Based on Pimoroni `install.sh` for [unicornhatmini-python](https://github.com/pimoroni/unicornhatmini-python) and [inky](https://github.com/pimoroni/inky)
+
+**Deploy guide** (deploy/README.md)
+- Full step-by-step: hostname, setup-pi, reboot, setup, install, enable
+- I2C verification with `i2cdetect` expected output
+- Troubleshooting: mDNS, lgpio, GPIO permissions, display issues
+- Network architecture diagram
+
+### 54 tests pass
+
+All existing M0-M1 tests pass plus new tests for:
+- `BasicImageBackend.render_frame()` produces PIL Image
+- `SparkDisplay` / `SlateDisplay` hardware flag detection + mock fallback
+- `GPIOButtonListener` keyboard fallback
+- `SlateDisplay.render_image()` accepts PIL Image
+
+---
+
 ## 2026-01-17 — M0-M1 Implementation & UX Fixes
 
 ### Bug Fixes
