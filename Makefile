@@ -27,19 +27,21 @@ setup-pi:
 		echo "setup-pi is for Raspberry Pi only. Skipping on $$(uname -s)."; \
 		exit 0; \
 	fi
+	@echo "Caching sudo credentials..."
+	@sudo -v
 	@echo ""
 	@echo "=== Installing Pimoroni Inky (Slate display) ==="
 	@echo ""
 	rm -rf /tmp/pimoroni-inky
 	git clone --depth 1 https://github.com/pimoroni/inky /tmp/pimoroni-inky
-	cd /tmp/pimoroni-inky && yes | ./install.sh
+	cd /tmp/pimoroni-inky && yes y | ./install.sh
 	rm -rf /tmp/pimoroni-inky
 	@echo ""
 	@echo "=== Installing Pimoroni Unicorn HAT Mini (Spark display) ==="
 	@echo ""
 	rm -rf /tmp/pimoroni-unicorn
 	git clone --depth 1 https://github.com/pimoroni/unicornhatmini-python /tmp/pimoroni-unicorn
-	cd /tmp/pimoroni-unicorn && yes | ./install.sh
+	cd /tmp/pimoroni-unicorn && yes y | ./install.sh
 	rm -rf /tmp/pimoroni-unicorn
 	@echo ""
 	@echo "✓ Pimoroni drivers installed."
