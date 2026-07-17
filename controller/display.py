@@ -17,6 +17,7 @@ class SparkMock(Display):
     height: int = 7
     unicorn: Optional[object] = None
     scroll_pos: int = 0
+    on_key: Optional[object] = None  # Callback: (char: str) -> None
 
     def __post_init__(self):
         """Initialize pygame unicorn mock."""
@@ -24,44 +25,39 @@ class SparkMock(Display):
             from controller.unicorn_mock import UnicornHATMiniBase
             self.unicorn = UnicornHATMiniBase()
             self.unicorn.set_brightness(0.5)
+            # Wire button callback
+            self.unicorn.on_button_pressed(self._on_button_pin)
 
     def render(self, state: StateSnapshot) -> None:
         """Render state to pygame window."""
         if not self.unicorn:
             return
 
-        # Clear display
-        self.unicorn.clear()
+        try:
+            self.unicorn.clear()
+            r, g, b = state.channel_color
 
-        # Map channel color
-        r, g, b = state.channel_color
+            # Row 0: color bar (full width)
+            for x in range(self.width):
+                self.unicorn.set_pixel(x, 0, r//4, g//4, b//4)
 
-        # Row 0: color bar (full width)
-        for x in range(self.width):
-            self.unicorn.set_pixel(x, 0, r//4, g//4, b//4)  # Dim
+            # Row 1: position pips
+            if state.option_count > 0:
+                for i in range(min(state.option_count, self.width)):
+                    if i == state.option_index:
+                        self.unicorn.set_pixel(i, 1, r, g, b)
+                    else:
+                        self.unicorn.set_pixel(i, 1, r//8, g//8, b//8)
 
-        # Row 1: position pips
-        if state.option_count > 0:
-            for i in range(min(state.option_count, self.width)):
-                if i == state.option_index:
-                    # Bright pip at current position
-                    self.unicorn.set_pixel(i, 1, r, g, b)
-                else:
-                    # Dim pip
-                    self.unicorn.set_pixel(i, 1, r//8, g//8, b//8)
+            # Rows 2-6: scrolling text
+            text = state.candidate
+            if state.mode == "engine" and state.engine:
+                text = f"[{state.engine['operator'].upper()}]"
+            self._render_text(text, r, g, b)
 
-        # Rows 2-6: scrolling text (5 rows = ~3px font height)
-        text = state.candidate
-
-        if state.mode == "engine" and state.engine:
-            # Engine mode: show operator
-            text = f"[{state.engine['operator'].upper()}]"
-
-        # Simple pixel text rendering
-        self._render_text(text, r, g, b)
-
-        # Update display
-        self.unicorn.show()
+            self.unicorn.show()
+        except Exception:
+            return
 
     def _render_text(self, text: str, r: int, g: int, b: int) -> None:
         """Render scrolling text on rows 2-6."""
@@ -111,11 +107,27 @@ class SparkMock(Display):
                             self.unicorn.set_pixel(x, y, r, g, b)
                 x_offset += 4  # 3px char + 1px space
 
+    def _on_button_pin(self, pin) -> None:
+        """Handle button press from unicorn mock."""
+        if pin == 'q':
+            # Window close event
+            if self.on_key:
+                self.on_key('q')
+            return
+        pin_map = {5: 'a', 6: 'b', 16: 'x', 24: 'y'}
+        char = pin_map.get(pin)
+        if char and self.on_key:
+            self.on_key(char)
+
     def close(self) -> None:
-        """Clean up pygame."""
+        """Clean up display."""
         if self.unicorn:
-            self.unicorn.clear()
-            self.unicorn.show()
+            try:
+                self.unicorn.clear()
+                self.unicorn.show()
+            except Exception:
+                pass
+            self.unicorn = None
 
 
 class SparkDisplay(Display):

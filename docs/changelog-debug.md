@@ -8,6 +8,27 @@ Development log of fixes, improvements, and debug sessions.
 
 ### Bug Fixes
 
+**Pygame keyboard focus + always-on-top** (commits 5f26b7d–cee07ea)
+- **Problem:** Keyboard input only worked in terminal, not when pygame window focused (rainbow wheel/hang). Windows hidden behind other apps.
+- **Root causes (found iteratively):**
+  1. stdin listener blocked on `sys.stdin.read(1)` — pygame events go to pygame queue, not stdin
+  2. `pygame.event.get()` only called in `render()`, which only ran on state updates — no updates = no event processing = frozen window
+  3. `asyncio.run_coroutine_threadsafe()` called FROM the event loop blocks — that function is for threads→loop, not loop→loop
+  4. `bus.start()` called `await self.server.wait_closed()` which blocks forever — `on_key` callback wiring after it never executed
+  5. `print()` output buffered when pygame has focus — needed `flush=True`
+  6. `pygame.quit()` is global — calling it in any display's `close()` kills all other displays in the same process (caused segfaults in tests)
+- **Fix:**
+  - Process KEYDOWN events in pygame render loop, wire `on_key` callback to button handlers
+  - `pygame.WINDOWSTAYSONTOP` flag for testing convenience
+  - Main loop continuously renders at ~20 FPS to process events
+  - Extracted `_schedule(coro)` helper: detects if on event loop (`create_task`) or thread (`run_coroutine_threadsafe`)
+  - Removed blocking `wait_closed()` from `bus.start()` — `websockets.serve()` runs server in background
+  - `print(flush=True)` for keypress feedback (logger.info silent at WARNING level in sim)
+  - Removed all `pygame.quit()` calls — `close()` nulls screen/unicorn instead
+  - Window close (QUIT event) routes through `on_key('q')` for clean shutdown
+  - Guard `render()` with try/except for pygame errors (safe in tests)
+- **Files:** `controller/display.py`, `conductor/display.py`, `controller/unicorn_mock.py`, `controller/controller.py`, `conductor/conductor.py`, `controller/__main__.py`, `conductor/__main__.py`, `shared/bus_websocket.py`
+
 **Thread-safe button events** (commit a8a4d8b)
 - **Problem:** Keyboard listener runs in thread, tried to call `asyncio.create_task()` without event loop → `RuntimeWarning: coroutine was never awaited`
 - **Fix:** Store event loop reference, use `asyncio.run_coroutine_threadsafe()` to schedule coroutines from threads

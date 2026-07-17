@@ -58,11 +58,10 @@ def test_spark_mock_scrolls_long_text():
         mock.render(state)
     mock.close()
 from conductor.display import InkyMock
-from PIL import Image
 
 
 def test_inky_mock_renders_without_crash():
-    """InkyMock renders state snapshot to PIL image."""
+    """InkyMock renders state snapshot to pygame window."""
     state = StateSnapshot(
         channel="subject",
         channel_color=(0, 200, 80),
@@ -93,6 +92,6 @@ def test_inky_mock_renders_sentence():
 
     mock = InkyMock(width=640, height=400)
     mock.render(state)
-    # Verify image was created
-    assert mock.image is not None
+    # Verify pygame screen was created
+    assert mock.screen is not None
     mock.close()

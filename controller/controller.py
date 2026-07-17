@@ -42,10 +42,15 @@ class Controller:
         hello = HelloMessage(device="spark", fw="0.1.0")
         await self.bus.send(hello.model_dump())
 
-        # Start button listener with exit callback
-        self.buttons = KeyboardListener(device="spark", on_exit=self._on_exit_signal)
-        self.buttons.on(self._on_button_event)
-        self.buttons.start()
+        # Wire keyboard input
+        if IS_SIMULATION and hasattr(self.display, 'on_key'):
+            # Pygame displays handle keyboard directly
+            self.display.on_key = self._on_key
+        else:
+            # Hardware: use GPIO button listener
+            self.buttons = KeyboardListener(device="spark", on_exit=self._on_exit_signal)
+            self.buttons.on(self._on_button_event)
+            self.buttons.start()
 
         # Start heartbeat task
         asyncio.create_task(self._heartbeat_loop())
@@ -96,17 +101,32 @@ class Controller:
         logger.info(f"Toast: {msg.get('text')}")
         # Could flash LED here
 
-    def _on_button_event(self, btn: str, event: str) -> None:
-        """Handle button press from keyboard."""
-        logger.info(f"Button event: {btn} {event}")
+    def _on_key(self, char: str) -> None:
+        """Handle key press from pygame display."""
+        # Map char to button name
+        key_map = {'a': 'A', 'b': 'B', 'x': 'X', 'y': 'Y'}
+        if char == 'q':
+            self._on_exit_signal()
+        elif char in key_map:
+            self._on_button_event(key_map[char], "press")
 
-        # Send to Conductor (thread-safe)
+    def _schedule(self, coro) -> None:
+        """Schedule a coroutine from either the event loop or a thread."""
+        if not self.loop:
+            return
+        try:
+            if asyncio.get_running_loop() == self.loop:
+                asyncio.create_task(coro)
+            else:
+                asyncio.run_coroutine_threadsafe(coro, self.loop)
+        except RuntimeError:
+            asyncio.run_coroutine_threadsafe(coro, self.loop)
+
+    def _on_button_event(self, btn: str, event: str) -> None:
+        """Handle button press."""
+        print(f"[Spark] {btn} {event}", flush=True)
         button_msg = ButtonMessage(btn=btn, event=event)
-        if self.loop:
-            asyncio.run_coroutine_threadsafe(
-                self.bus.send(button_msg.model_dump()),
-                self.loop
-            )
+        self._schedule(self.bus.send(button_msg.model_dump()))
 
     def _on_exit_signal(self) -> None:
         """Handle exit signal from button listener (Ctrl+C or q)."""

@@ -42,7 +42,15 @@ class UnicornHATMiniBase:
         
         # Initialize pygame
         pygame.init()
-        self.screen = pygame.display.set_mode((self.WIDTH * self.scale, self.HEIGHT * self.scale))
+        # WINDOWSTAYSONTOP for testing convenience (pygame 2.0+)
+        try:
+            self.screen = pygame.display.set_mode(
+                (self.WIDTH * self.scale, self.HEIGHT * self.scale),
+                pygame.WINDOWSTAYSONTOP
+            )
+        except:
+            # Fallback if flag not supported
+            self.screen = pygame.display.set_mode((self.WIDTH * self.scale, self.HEIGHT * self.scale))
         pygame.display.set_caption("Unicorn HAT Mini Emulator")
         
         # Draw initial state
@@ -54,11 +62,10 @@ class UnicornHATMiniBase:
         print("Use A/B/X/Y or Arrow keys to simulate buttons")
         
     def __del__(self):
-        """Clean up pygame on exit"""
-        try:
-            pygame.quit()
-        except:
-            pass
+        """Clean up on exit."""
+        # ponytail: don't call pygame.quit() — it's global and breaks other
+        # displays in the same process (tests, multi-window sim)
+        pass
     
     def set_pixel(self, x, y, r, g, b):
         """Set a single pixel."""
@@ -211,8 +218,10 @@ class UnicornHATMiniBase:
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                # Signal quit via 'q' key callback instead of global pygame.quit()
+                if self.button_callback:
+                    self.button_callback('q')
+                return
             elif event.type == pygame.KEYDOWN:
                 if event.key in key_map:
                     button = key_map[event.key]

@@ -68,7 +68,7 @@ class WebSocketServer(BusServer):
             handle_client, host, port, ping_interval=2, ping_timeout=1
         )
         logger.info(f"WebSocket server listening on ws://{host}:{port}")
-        await self.server.wait_closed()
+        # Don't await wait_closed() — let caller control the event loop
 
 
 class WebSocketClient(BusClient):

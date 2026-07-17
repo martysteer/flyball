@@ -23,9 +23,12 @@ async def main():
         logger.info(f"Connecting to Conductor at {host}:{port}...")
         await controller.connect(host, port)
 
-        # Keep running
+        # Keep running and process events
         while controller.running:
-            await asyncio.sleep(0.1)
+            # Re-render to process pygame events (keyboard, window close)
+            if controller.current_state:
+                controller.display.render(controller.current_state)
+            await asyncio.sleep(0.05)  # ~20 FPS event processing
 
     except KeyboardInterrupt:
         logger.info("Shutting down...")

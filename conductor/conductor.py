@@ -24,13 +24,8 @@ class Conductor:
         self.bus = WebSocketServer()
         self.display = InkyMock() if IS_SIMULATION else SlateDisplay()
         self.loop = None  # Store event loop for thread-safe scheduling
-
-        # Slate button listener (sim)
         self.buttons: Optional[KeyboardListener] = None
         self.server_running = True  # Track server state for exit
-        if IS_SIMULATION:
-            self.buttons = KeyboardListener(device="slate", on_exit=self._on_exit_signal)
-            self.buttons.on(self._on_slate_button)
 
         # Register message handlers
         self.bus.on("hello", self._on_hello)
@@ -41,6 +36,19 @@ class Conductor:
         """Start WebSocket server and display."""
         self.loop = asyncio.get_running_loop()  # Capture loop for thread-safe calls
         await self.bus.start(host, port)
+
+        # Wire keyboard input
+        if IS_SIMULATION and hasattr(self.display, 'on_key'):
+            # Pygame displays handle keyboard directly
+            self.display.on_key = self._on_key
+        else:
+            # Hardware: use GPIO button listener
+            self.buttons = KeyboardListener(device="slate", on_exit=self._on_exit_signal)
+            self.buttons.on(self._on_slate_button)
+            self.buttons.start()
+
+        # Render initial state
+        self._broadcast_state()
 
     async def shutdown(self) -> None:
         """Shut down server."""
@@ -58,6 +66,7 @@ class Conductor:
         btn = msg.get("btn")
         event = msg.get("event")
         logger.info(f"Button: {btn} {event}")
+        print(f"[Spark] {btn} {event}", flush=True)
 
         # Interpret button
         if event == "press":
@@ -81,23 +90,39 @@ class Conductor:
         pong = PongMessage()
         asyncio.create_task(self.bus.send(pong.model_dump()))
 
+    def _on_key(self, char: str) -> None:
+        """Handle key press from pygame display."""
+        # Map char to button name
+        key_map = {'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D'}
+        if char == 'q':
+            self._on_exit_signal()
+        elif char in key_map:
+            self._on_slate_button(key_map[char], "press")
+
     def _on_slate_button(self, btn: str, event: str) -> None:
         """Handle button press on Slate (change channel)."""
-        logger.info(f"Slate button: {btn} {event}")
+        channel_map = {"A": "subject", "B": "context", "C": "style", "D": "engine"}
+        if event == "press" and btn in channel_map:
+            print(f"[Slate] {btn} → channel: {channel_map[btn]}", flush=True)
+            self.registry.set_active_channel(channel_map[btn])
+            self._broadcast_state()
 
-        if event == "press":
-            channel_map = {"A": "subject", "B": "context", "C": "style", "D": "engine"}
-            if btn in channel_map:
-                self.registry.set_active_channel(channel_map[btn])
-                # Broadcast updated state
-                self._broadcast_state()
+    def _schedule(self, coro) -> None:
+        """Schedule a coroutine from either the event loop or a thread."""
+        if not self.loop:
+            return
+        try:
+            if asyncio.get_running_loop() == self.loop:
+                asyncio.create_task(coro)
+            else:
+                asyncio.run_coroutine_threadsafe(coro, self.loop)
+        except RuntimeError:
+            asyncio.run_coroutine_threadsafe(coro, self.loop)
 
     def _on_exit_signal(self) -> None:
         """Handle exit signal from button listener (Ctrl+C or q)."""
         self.server_running = False
-        # Trigger server shutdown (thread-safe)
-        if self.loop:
-            asyncio.run_coroutine_threadsafe(self.shutdown(), self.loop)
+        self._schedule(self.shutdown())
 
     def _broadcast_state(self) -> None:
         """Send current state to all connected Controllers."""
@@ -112,12 +137,7 @@ class Conductor:
             mode=snapshot.mode,
             engine=snapshot.engine,
         )
-        # Send message (thread-safe)
-        if self.loop:
-            asyncio.run_coroutine_threadsafe(
-                self.bus.send(msg.model_dump()),
-                self.loop
-            )
+        self._schedule(self.bus.send(msg.model_dump()))
 
         # Also render to Slate display
         self.display.render(snapshot)

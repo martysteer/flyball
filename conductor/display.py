@@ -22,6 +22,7 @@ class InkyMock(Display):
     font_large: Optional[object] = field(default=None, init=False)
     font_small: Optional[object] = field(default=None, init=False)
     font_tiny: Optional[object] = field(default=None, init=False)
+    on_key: Optional[object] = None  # Callback: (char: str) -> None
 
     # Colors
     COLOR_WHITE = (255, 255, 255)
@@ -49,7 +50,15 @@ class InkyMock(Display):
         """Initialize pygame window."""
         if IS_SIMULATION:
             pygame.init()
-            self.screen = pygame.display.set_mode((self.width, self.height))
+            # WINDOWSTAYSONTOP for testing convenience (pygame 2.0+)
+            try:
+                self.screen = pygame.display.set_mode(
+                    (self.width, self.height),
+                    pygame.WINDOWSTAYSONTOP
+                )
+            except:
+                # Fallback if flag not supported
+                self.screen = pygame.display.set_mode((self.width, self.height))
             pygame.display.set_caption("Flyball Slate Mock (Inky Impression)")
 
             # Load fonts
@@ -68,11 +77,29 @@ class InkyMock(Display):
         if not self.screen:
             return
 
-        # Process pygame events (prevent window freeze)
-        for event in pygame.event.get():
+        try:
+            events = pygame.event.get()
+        except pygame.error:
+            return
+
+        # Process pygame events (prevent window freeze + handle keyboard)
+        for event in events:
             if event.type == pygame.QUIT:
-                pygame.quit()
+                if self.on_key:
+                    self.on_key('q')
                 return
+            elif event.type == pygame.KEYDOWN:
+                # Map keys to Slate buttons (a/b/c/d)
+                key_map = {
+                    pygame.K_a: 'a',
+                    pygame.K_b: 'b',
+                    pygame.K_c: 'c',
+                    pygame.K_d: 'd',
+                    pygame.K_q: 'q',  # Quit
+                }
+                char = key_map.get(event.key)
+                if char and self.on_key:
+                    self.on_key(char)
 
         # Clear to white
         self.screen.fill(self.COLOR_WHITE)
@@ -206,11 +233,11 @@ class InkyMock(Display):
         self.screen.blit(surface, rect)
 
     def close(self) -> None:
-        """Clean up pygame."""
+        """Clean up display."""
         if self.screen:
             self.screen.fill(self.COLOR_WHITE)
             pygame.display.flip()
-            pygame.quit()
+            self.screen = None
 
 
 class SlateDisplay(Display):

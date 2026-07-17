@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from conductor.conductor import Conductor
+from conductor.state_machine import StateSnapshot
 from shared.config import get_word_blocks_path, IS_SIMULATION
 
 # In simulation, reduce logging noise
@@ -25,14 +26,18 @@ async def main():
 
     try:
         logger.info("Starting Conductor server...")
-
-        # Start button listener (if in sim)
-        if conductor.buttons:
-            conductor.buttons.start()
-
         await conductor.start("localhost", 8765)
+
+        # Keep running and process events
+        while conductor.server_running:
+            # Re-render to process pygame events (keyboard, window close)
+            snapshot = StateSnapshot.from_registry(conductor.registry, mode="word")
+            conductor.display.render(snapshot)
+            await asyncio.sleep(0.05)  # ~20 FPS event processing
+
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+    finally:
         if conductor.buttons:
             conductor.buttons.stop()
         await conductor.shutdown()
