@@ -5,7 +5,6 @@ import json
 import logging
 from typing import Any, Callable, Dict, Optional, Set
 import websockets
-from websockets.server import WebSocketServerProtocol
 
 from shared.interfaces.bus import BusServer, BusClient
 
@@ -17,7 +16,7 @@ class WebSocketServer(BusServer):
 
     def __init__(self):
         self.handlers: Dict[str, Callable] = {}
-        self.clients: Set[WebSocketServerProtocol] = set()
+        self.clients: Set[Any] = set()
         self.server = None
 
     def on(self, msg_type: str, handler: Callable[[Dict[str, Any]], None]) -> None:
@@ -47,7 +46,7 @@ class WebSocketServer(BusServer):
 
     async def start(self, host: str, port: int) -> None:
         """Start WebSocket server."""
-        async def handle_client(websocket: WebSocketServerProtocol, path: str):
+        async def handle_client(websocket):
             self.clients.add(websocket)
             logger.info(f"Client connected: {websocket.remote_address}")
             try:
@@ -76,7 +75,7 @@ class WebSocketClient(BusClient):
 
     def __init__(self):
         self.handlers: Dict[str, Callable] = {}
-        self.websocket: Optional[WebSocketServerProtocol] = None
+        self.websocket: Optional[Any] = None
         self.running = False
 
     def on(self, msg_type: str, handler: Callable[[Dict[str, Any]], None]) -> None:
