@@ -89,17 +89,31 @@ class WebSocketClient(BusClient):
             msg_json = json.dumps(msg)
             await self.websocket.send(msg_json)
 
-    async def connect(self, host: str, port: int) -> None:
-        """Connect to WebSocket server."""
-        try:
-            self.websocket = await websockets.connect(f"ws://{host}:{port}")
-            self.running = True
-            logger.info(f"Connected to ws://{host}:{port}")
+    async def connect(self, host: str, port: int, max_retries: int = 60) -> None:
+        """Connect to WebSocket server with retry + exponential backoff.
 
-            # Listen for messages
-            asyncio.create_task(self._listen())
-        except Exception as e:
-            logger.error(f"Connection failed: {e}")
+        Args:
+            host: Server hostname
+            port: Server port
+            max_retries: Max connection attempts (default 60 = ~10 min with backoff)
+        """
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                self.websocket = await websockets.connect(f"ws://{host}:{port}")
+                self.running = True
+                logger.info(f"Connected to ws://{host}:{port}")
+                asyncio.create_task(self._listen())
+                return
+            except Exception as e:
+                attempt += 1
+                if attempt >= max_retries:
+                    logger.error(f"Failed to connect after {max_retries} attempts: {e}")
+                    raise
+                # Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+                wait = min(2 ** (attempt - 1), 30)
+                logger.warning(f"Connection attempt {attempt} failed: {e}. Retrying in {wait}s...")
+                await asyncio.sleep(wait)
 
     async def disconnect(self) -> None:
         """Disconnect from server."""
