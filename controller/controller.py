@@ -42,8 +42,8 @@ class Controller:
         hello = HelloMessage(device="spark", fw="0.1.0")
         await self.bus.send(hello.model_dump())
 
-        # Start button listener
-        self.buttons = KeyboardListener(device="spark")
+        # Start button listener with exit callback
+        self.buttons = KeyboardListener(device="spark", on_exit=self._on_exit_signal)
         self.buttons.on(self._on_button_event)
         self.buttons.start()
 
@@ -107,6 +107,10 @@ class Controller:
                 self.bus.send(button_msg.model_dump()),
                 self.loop
             )
+
+    def _on_exit_signal(self) -> None:
+        """Handle exit signal from button listener (Ctrl+C or q)."""
+        self.running = False
 
     async def _heartbeat_loop(self) -> None:
         """Send periodic ping to Conductor."""

@@ -55,11 +55,21 @@ Development log of fixes, improvements, and debug sessions.
 - **Fix:** Use ANSI escape codes directly (`\033[2J\033[H` for clear + home cursor) instead of system call
 - **Files:** `controller/display.py`
 
-**Ctrl+C exit not working** (this commit)
-- **Problem:** Raw mode captures Ctrl+C as `\x03` char, doesn't raise KeyboardInterrupt
-- **Fix:** Check for `\x03` in input loop, print message and exit cleanly
-- **Files:** `controller/buttons.py`, `conductor/buttons.py`
-- **Note:** Both `q` and Ctrl+C now exit cleanly
+**Ctrl+C exit not working** (commit c7dd7cb + this commit)
+- **Problem:** Raw mode captures Ctrl+C as `\x03` char, doesn't raise KeyboardInterrupt. First fix only stopped button thread, main loop kept running.
+- **Fix:** Added `on_exit` callback to button listeners that signals main Controller/Conductor to shut down
+- **Files:** `controller/buttons.py`, `conductor/buttons.py`, `controller/controller.py`, `conductor/conductor.py`
+- **Note:** Both `q` and Ctrl+C now exit cleanly and immediately
+
+**Logging noise interfering with display** (this commit)
+- **Problem:** INFO logs mixing with ANSI terminal output → garbled display
+- **Fix:** Set log level to WARNING in simulation mode (logs to stderr, display to stdout)
+- **Files:** `controller/__main__.py`, `conductor/__main__.py`
+
+**Display buffering** (this commit)
+- **Problem:** ANSI clear codes not flushing immediately
+- **Fix:** Use `sys.stdout.write()` + explicit `flush()` for clear codes
+- **Files:** `controller/display.py`
 
 ## Known Issues
 

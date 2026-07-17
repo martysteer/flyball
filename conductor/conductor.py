@@ -27,8 +27,9 @@ class Conductor:
 
         # Slate button listener (sim)
         self.buttons: Optional[KeyboardListener] = None
+        self.server_running = True  # Track server state for exit
         if IS_SIMULATION:
-            self.buttons = KeyboardListener(device="slate")
+            self.buttons = KeyboardListener(device="slate", on_exit=self._on_exit_signal)
             self.buttons.on(self._on_slate_button)
 
         # Register message handlers
@@ -90,6 +91,13 @@ class Conductor:
                 self.registry.set_active_channel(channel_map[btn])
                 # Broadcast updated state
                 self._broadcast_state()
+
+    def _on_exit_signal(self) -> None:
+        """Handle exit signal from button listener (Ctrl+C or q)."""
+        self.server_running = False
+        # Trigger server shutdown (thread-safe)
+        if self.loop:
+            asyncio.run_coroutine_threadsafe(self.shutdown(), self.loop)
 
     def _broadcast_state(self) -> None:
         """Send current state to all connected Controllers."""

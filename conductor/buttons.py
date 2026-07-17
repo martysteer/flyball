@@ -13,10 +13,11 @@ IS_SIMULATION = platform.system() != "Linux"
 class KeyboardListener:
     """Keyboard-based button listener (Conductor sim)."""
 
-    def __init__(self, device: str = "slate"):
+    def __init__(self, device: str = "slate", on_exit: Optional[Callable] = None):
         """Initialize. device: 'slate' (a/b/c/d)."""
         self.device = device
         self.handler: Optional[Callable] = None
+        self.on_exit = on_exit  # Called on Ctrl+C or 'q'
         self.running = False
         self.thread: Optional[threading.Thread] = None
 
@@ -63,18 +64,18 @@ class KeyboardListener:
                     char = sys.stdin.read(1).lower()
 
                     # Handle Ctrl+C (raw mode captures it as \x03)
-                    if char == "\x03":
-                        print("\n^C (Ctrl+C caught - exiting)")
+                    if char == "\x03" or char == "q":
+                        if char == "\x03":
+                            print("\n^C")
                         self.running = False
+                        if self.on_exit:
+                            self.on_exit()  # Signal main loop to exit
                         break
 
                     if char in self.key_map:
                         btn = self.key_map[char]
                         if self.handler:
                             self.handler(btn, "press")
-
-                    if char == "q":
-                        self.running = False
                 except Exception as e:
                     print(f"\nKeyboard error: {e}")
                     break

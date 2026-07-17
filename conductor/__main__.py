@@ -8,7 +8,8 @@ from pathlib import Path
 from conductor.conductor import Conductor
 from shared.config import get_word_blocks_path, IS_SIMULATION
 
-logging.basicConfig(level=logging.INFO)
+# In simulation, reduce logging noise
+logging.basicConfig(level=logging.WARNING if IS_SIMULATION else logging.INFO)
 logger = logging.getLogger(__name__)
 
 

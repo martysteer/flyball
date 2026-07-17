@@ -7,7 +7,8 @@ import sys
 from controller.controller import Controller
 from shared.config import get_conductor_host, get_conductor_port, IS_SIMULATION
 
-logging.basicConfig(level=logging.INFO)
+# In simulation, reduce logging noise (display uses stdout)
+logging.basicConfig(level=logging.WARNING if IS_SIMULATION else logging.INFO)
 logger = logging.getLogger(__name__)
 
 

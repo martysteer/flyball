@@ -33,10 +33,11 @@ class ButtonListener(ABC):
 class KeyboardListener(ButtonListener):
     """Keyboard-based button listener (sim only)."""
 
-    def __init__(self, device: str = "spark"):
+    def __init__(self, device: str = "spark", on_exit: Optional[Callable] = None):
         """Initialize. device: 'spark' (a/b/x/y) or 'slate' (a/b/c/d)."""
         self.device = device
         self.handler: Optional[Callable] = None
+        self.on_exit = on_exit  # Called on Ctrl+C or 'q'
         self.running = False
         self.thread: Optional[threading.Thread] = None
 
@@ -86,18 +87,18 @@ class KeyboardListener(ButtonListener):
                     char = sys.stdin.read(1).lower()
 
                     # Handle Ctrl+C (raw mode captures it as \x03)
-                    if char == "\x03":
-                        print("\n^C (Ctrl+C caught - exiting)")
+                    if char == "\x03" or char == "q":
+                        if char == "\x03":
+                            print("\n^C")
                         self.running = False
+                        if self.on_exit:
+                            self.on_exit()  # Signal main loop to exit
                         break
 
                     if char in self.key_map:
                         btn = self.key_map[char]
                         if self.handler:
                             self.handler(btn, "press")
-
-                    if char == "q":
-                        self.running = False
                 except Exception as e:
                     print(f"\nKeyboard error: {e}")
                     break

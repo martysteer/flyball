@@ -97,7 +97,8 @@ class SparkMock(Display):
                 matrix[6][i] = ch
 
         # Render to terminal (use ANSI codes, not os.system which breaks in raw mode)
-        print(f"\033[2J\033[H", end="")  # Clear screen + cursor home
+        sys.stdout.write(f"\033[2J\033[H")  # Clear screen + cursor home
+        sys.stdout.flush()
         print(f"\n{color}Spark 17×7 Mock — Channel: {state.channel.upper()}{ANSI_RESET}\n")
 
         # Print matrix
