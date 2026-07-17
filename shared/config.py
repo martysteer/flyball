@@ -8,10 +8,10 @@ from typing import Optional
 IS_SIMULATION = platform.system() != "Linux"
 
 def get_conductor_host() -> str:
-    """Resolve Conductor hostname: env → localhost (sim) → slate.local (hardware)."""
+    """Resolve Conductor hostname: env → localhost (sim) → flyball-slate.local (hardware)."""
     if os.getenv("FLYBALL_CONDUCTOR_HOST"):
         return os.getenv("FLYBALL_CONDUCTOR_HOST")
-    return "localhost" if IS_SIMULATION else "slate.local"
+    return "localhost" if IS_SIMULATION else "flyball-slate.local"
 
 def get_conductor_port() -> int:
     """WebSocket port."""
