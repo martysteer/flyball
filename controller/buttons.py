@@ -85,6 +85,12 @@ class KeyboardListener(ButtonListener):
                     # Read one character (unbuffered)
                     char = sys.stdin.read(1).lower()
 
+                    # Handle Ctrl+C (raw mode captures it as \x03)
+                    if char == "\x03":
+                        print("\n^C (Ctrl+C caught - exiting)")
+                        self.running = False
+                        break
+
                     if char in self.key_map:
                         btn = self.key_map[char]
                         if self.handler:

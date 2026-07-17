@@ -50,12 +50,22 @@ Development log of fixes, improvements, and debug sessions.
 
 ---
 
+**ANSI clear screen in raw mode** (this commit)
+- **Problem:** `os.system("clear")` doesn't work in raw terminal mode → garbled display with progressive indentation
+- **Fix:** Use ANSI escape codes directly (`\033[2J\033[H` for clear + home cursor) instead of system call
+- **Files:** `controller/display.py`
+
+**Ctrl+C exit not working** (this commit)
+- **Problem:** Raw mode captures Ctrl+C as `\x03` char, doesn't raise KeyboardInterrupt
+- **Fix:** Check for `\x03` in input loop, print message and exit cleanly
+- **Files:** `controller/buttons.py`, `conductor/buttons.py`
+- **Note:** Both `q` and Ctrl+C now exit cleanly
+
 ## Known Issues
 
 ### Terminal Display
-- SparkMock clears screen on each render (uses `os.system("clear")`)
-  - Harmless in sim, but could flicker
-  - **TODO:** Use ANSI cursor positioning instead of clearing (M2 polish)
+- Terminal may need to be wide enough for 17-char matrix + borders
+  - Minimum ~25 chars wide recommended
 
 ### Slate Window
 - Tkinter window updates work, but window doesn't auto-focus
