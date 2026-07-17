@@ -11,8 +11,11 @@ from conductor.buttons import KeyboardListener
 from shared.bus_websocket import WebSocketServer
 from shared.messages import ButtonMessage, StateMessage, PongMessage
 from shared.config import IS_SIMULATION
+from shared.keymap import Keymap, normalize_action
 
 logger = logging.getLogger(__name__)
+
+KEYMAPS_DIR = Path(__file__).parent.parent / "shared" / "keymaps"
 
 
 class Conductor:
@@ -26,6 +29,20 @@ class Conductor:
         self.loop = None  # Store event loop for thread-safe scheduling
         self.buttons: Optional[KeyboardListener] = None
         self.server_running = True  # Track server state for exit
+
+        # Load keymaps
+        self.spark_keymap = Keymap.load(KEYMAPS_DIR / "spark.json")
+        self.slate_keymap = Keymap.load(KEYMAPS_DIR / "slate.json")
+
+        # Action handlers — keyed by action name from keymap JSON
+        self.actions = {
+            "prev": lambda: self.registry.button_prev(),
+            "next": lambda: self.registry.button_next(),
+            "commit": lambda: self.registry.button_commit(),
+            "shift": lambda: self.registry.button_shift(),
+            "cycle_setting": lambda: self.registry.button_shift(),
+            "channel": lambda target: self.registry.set_active_channel(target),
+        }
 
         # Register message handlers
         self.bus.on("hello", self._on_hello)
@@ -61,29 +78,26 @@ class Conductor:
         # Send current state snapshot
         self._broadcast_state()
 
+    def _dispatch(self, keymap: Keymap, btn: str, event: str, label: str) -> None:
+        """Resolve button via keymap and dispatch action."""
+        if event != "press":
+            return
+        raw = keymap.resolve(btn, self.registry.active_channel)
+        if raw is None:
+            return
+        action, params = normalize_action(raw)
+        handler = self.actions.get(action)
+        if handler:
+            print(f"[{label}] {btn} → {action}{(' ' + str(params)) if params else ''}", flush=True)
+            handler(**params)
+            self._broadcast_state()
+
     def _on_button(self, msg: dict) -> None:
-        """Handle button event from Controller."""
+        """Handle button event from Controller (Spark)."""
         btn = msg.get("btn")
         event = msg.get("event")
         logger.info(f"Button: {btn} {event}")
-        print(f"[Spark] {btn} {event}", flush=True)
-
-        # Interpret button
-        if event == "press":
-            if btn == "A":
-                self.registry.button_prev()
-            elif btn == "B":
-                self.registry.button_next()
-            elif btn == "X":
-                self.registry.button_commit()
-            elif btn == "Y":
-                self.registry.button_shift()
-            elif btn == "C":  # Slate button (switch channel)
-                # For M1, just log; M2 will handle SEND
-                pass
-
-        # Broadcast updated state
-        self._broadcast_state()
+        self._dispatch(self.spark_keymap, btn, event, "Spark")
 
     def _on_ping(self, msg: dict) -> None:
         """Handle ping from Controller."""
@@ -92,7 +106,7 @@ class Conductor:
 
     def _on_key(self, char: str) -> None:
         """Handle key press from pygame display."""
-        # Map char to button name
+        # Map char to button name (physical layer — not keymap concern)
         key_map = {'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D'}
         if char == 'q':
             self._on_exit_signal()
@@ -100,12 +114,8 @@ class Conductor:
             self._on_slate_button(key_map[char], "press")
 
     def _on_slate_button(self, btn: str, event: str) -> None:
-        """Handle button press on Slate (change channel)."""
-        channel_map = {"A": "subject", "B": "context", "C": "style", "D": "engine"}
-        if event == "press" and btn in channel_map:
-            print(f"[Slate] {btn} → channel: {channel_map[btn]}", flush=True)
-            self.registry.set_active_channel(channel_map[btn])
-            self._broadcast_state()
+        """Handle button press on Slate."""
+        self._dispatch(self.slate_keymap, btn, event, "Slate")
 
     def _schedule(self, coro) -> None:
         """Schedule a coroutine from either the event loop or a thread."""
