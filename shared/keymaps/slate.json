@@ -1,0 +1,10 @@
+{
+  "role": "slate",
+  "buttons": ["A", "B", "C", "D"],
+  "default": {
+    "A": { "action": "channel", "target": "subject" },
+    "B": { "action": "channel", "target": "context" },
+    "C": { "action": "channel", "target": "style" },
+    "D": { "action": "channel", "target": "engine" }
+  }
+}

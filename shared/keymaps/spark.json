@@ -1,0 +1,15 @@
+{
+  "role": "spark",
+  "buttons": ["A", "B", "X", "Y"],
+  "default": {
+    "A": "prev",
+    "B": "next",
+    "X": "commit",
+    "Y": "shift"
+  },
+  "channels": {
+    "engine": {
+      "Y": "cycle_setting"
+    }
+  }
+}
