@@ -46,7 +46,7 @@ setup-pi:
 	else \
 		echo "$$HOME/unicornhatmini-python already exists, skipping clone"; \
 	fi
-	cd $$HOME/unicornhatmini-python && yes y | ./install.sh
+	cd $$HOME/unicornhatmini-python && yes y | sudo ./install.sh
 	@echo ""
 	@echo "✓ Pimoroni drivers installed."
 	@echo "  REBOOT REQUIRED: sudo reboot"
