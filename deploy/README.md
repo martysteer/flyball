@@ -5,8 +5,8 @@ Deploy Flyball to two Raspberry Pi Zero 2 W boards: one Slate (Inky Impression),
 ## Prerequisites
 
 **Two Pi Zero 2 W boards:**
-- Slate: Inky Impression 4" (640×400, 7-colour e-paper)
-- Spark: Unicorn HAT Mini (17×7 RGB LED matrix)
+- Slate: Inky Impression 4" (640x400, 7-colour e-paper)
+- Spark: Unicorn HAT Mini (17x7 RGB LED matrix)
 
 **Both Pis:**
 - Raspberry Pi OS Lite (Bookworm or later)
@@ -21,58 +21,53 @@ Set hostnames so devices discover each other via mDNS.
 **On Slate Pi:**
 ```bash
 sudo hostnamectl set-hostname flyball-slate
+sudo reboot
 ```
 
 **On Spark Pi:**
 ```bash
 sudo hostnamectl set-hostname flyball-spark
+sudo reboot
 ```
 
-Reboot both Pis. Verify discovery:
+Verify discovery:
 ```bash
 # From Spark, ping Slate
 ping -c 3 flyball-slate.local
-
-# From Slate, ping Spark
-ping -c 3 flyball-spark.local
 ```
 
-## Step 1.5: Enable I2C and Verify Hardware
+## Step 2: Hardware Setup (one-time)
+
+Power off each Pi, seat HAT firmly on all 40 GPIO pins, power on. Then:
 
 **On both Pis:**
-
-1. **Enable I2C interface:**
 ```bash
-sudo raspi-config
+cd ~/flyball
+make setup-pi
 ```
-Navigate to: `Interface Options → I2C → Enable`
 
-Reboot after enabling.
+This runs the Pimoroni-equivalent hardware setup:
+- Enables **SPI** (required by both Unicorn HAT Mini and Inky Impression)
+- Enables **I2C** (required by Inky Impression EEPROM and Unicorn HAT Mini LED driver)
+- Adds `/boot/firmware/config.txt` overlays for Inky: `dtoverlay=spi0-0cs`, `dtoverlay=i2c1`
+- Installs **python3-lgpio** system package (GPIO pin factory for gpiozero)
 
-2. **Verify HAT is properly seated:**
-   - Power off the Pi
-   - Ensure HAT is firmly seated on all 40 GPIO pins
-   - No gaps between HAT and Pi header
-   - Power on
+**Reboot required after `setup-pi`:**
+```bash
+sudo reboot
+```
 
-3. **Check I2C devices detected:**
+### Verify hardware after reboot
 
 **On Slate Pi (Inky Impression):**
 ```bash
 sudo i2cdetect -y 1
 ```
 
-Expected output should show device at `0x50` (EEPROM):
+Expected: device at `0x50` (EEPROM):
 ```
      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-00:          -- -- -- -- -- -- -- -- -- -- -- -- --
-10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 50: 50 -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-70: -- -- -- -- -- -- -- --
 ```
 
 **On Spark Pi (Unicorn HAT Mini):**
@@ -80,90 +75,70 @@ Expected output should show device at `0x50` (EEPROM):
 sudo i2cdetect -y 1
 ```
 
-Expected output should show device at `0x77` (IS31FL3731 LED driver):
+Expected: device at `0x77` (IS31FL3731 LED driver):
 ```
      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-00:          -- -- -- -- -- -- -- -- -- -- -- -- --
-10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 70: -- -- -- -- -- -- -- 77
 ```
 
 **If devices not detected:**
-- Reseat HAT firmly on GPIO header
-- Check for bent pins
-- Verify I2C is enabled in raspi-config
-- Try a different power supply (low voltage can cause I2C issues)
-
-**Fallback behavior:**
-If hardware detection fails, both apps fall back to pygame mock windows. This allows testing the WebSocket bus and state machine without physical displays. Hardware detection happens at startup in `SlateDisplay` and `SparkDisplay` classes.
-
-## Step 2: Clone Repository
-
-**On both Pis:**
-```bash
-cd ~
-git clone https://github.com/YOUR_USERNAME/flyball.git
-cd flyball
-```
+- Power off, reseat HAT on GPIO header, check for bent pins
+- Verify SPI/I2C enabled: `sudo raspi-config` > Interface Options
+- Try a different power supply (low voltage causes I2C issues)
 
 ## Step 3: Install Dependencies
 
 **On both Pis:**
 ```bash
+cd ~/flyball
 make setup
 ```
 
-This creates a venv and installs:
-- WebSocket client/server (`websockets`)
-- Image compositing (`pillow`)
-- Display mocks for debugging (`pygame`)
-- Hardware drivers (`unicornhatmini`, `inky[rpi]`, `gpiozero`)
+Creates a venv (with `--system-site-packages` for GPIO access) and installs:
+- `websockets` — WebSocket client/server
+- `pillow` — image compositing
+- `pygame` — display mocks (dev/debug)
+- `unicornhatmini` — LED matrix driver
+- `inky` — e-paper driver
+- `gpiozero` — button GPIO (uses system `lgpio` as pin factory)
 
-Hardware driver build failures on non-Pi platforms are expected — hardware detection falls back to mocks. On real Pis, drivers should compile successfully.
+If setup ends with `lgpio not found`, run `make setup-pi` first.
 
 ## Step 4: Install systemd Services
 
+**On both Pis:**
+```bash
+make install
+```
+
 **On Slate Pi:**
 ```bash
-cd ~/flyball
-make install
-sudo systemctl enable flyball-slate
-sudo systemctl start flyball-slate
+sudo systemctl enable --now flyball-slate
 ```
 
 **On Spark Pi:**
 ```bash
-cd ~/flyball
-make install
-sudo systemctl enable flyball-spark
-sudo systemctl start flyball-spark
+sudo systemctl enable --now flyball-spark
 ```
 
 Services start automatically on boot with `Restart=always`.
 
 ## Step 5: Verify Running
 
-**Check service status:**
 ```bash
 # On Slate
 sudo systemctl status flyball-slate
-
-# On Spark
-sudo systemctl status flyball-spark
-```
-
-**View logs:**
-```bash
-# On Slate
 sudo journalctl -u flyball-slate -f
 
 # On Spark
+sudo systemctl status flyball-spark
 sudo journalctl -u flyball-spark -f
+```
+
+Slate should log:
+```
+INFO: Starting Conductor server...
+INFO: WebSocket server listening on ws://localhost:8765
 ```
 
 Spark should log:
@@ -171,28 +146,22 @@ Spark should log:
 INFO: Connected to Conductor at ws://flyball-slate.local:8765
 ```
 
-Slate should log:
-```
-INFO: Controller connected
-```
-
 ## Service Files
 
 ### flyball-slate.service
 - Runs: `python -m conductor`
-- Binds: `0.0.0.0:8765` (listens on all interfaces)
-- Role: State authority, WebSocket server, image generation, Inky display driver
+- Binds: `0.0.0.0:8765` (WebSocket server on all interfaces)
+- Role: State authority, image generation, Inky display driver
 
 ### flyball-spark.service
 - Runs: `python -m controller`
 - Connects to: `flyball-slate.local:8765`
 - Role: LED UI, button events, WebSocket client
 
-Override Conductor host via environment:
+Override Conductor host:
 ```bash
 sudo systemctl edit flyball-spark
 ```
-Add:
 ```ini
 [Service]
 Environment="FLYBALL_CONDUCTOR_HOST=192.168.1.42"
@@ -200,145 +169,105 @@ Environment="FLYBALL_CONDUCTOR_HOST=192.168.1.42"
 
 ## Hardware Detection
 
-Both apps detect hardware at startup:
+On Pi hardware, apps exit with a clear error if hardware isn't detected.
+On Mac/Linux (simulation mode), apps fall back to pygame mock windows.
 
-**Slate:**
-- Tries `from inky.auto import auto` → real Inky Impression
-- Falls back to `InkyMock` (pygame window) if import fails
-
-**Spark:**
-- Tries `from unicornhatmini import UnicornHATMini` → real LED matrix
-- Falls back to `SparkMock` (pygame window) if import fails
-
-**Buttons (both):**
-- Tries `gpiozero` for BCM 5/6/16/24 GPIO listeners
-- Falls back to `KeyboardListener` (pygame key events) if GPIO unavailable
-
-Run on a Mac or Linux dev machine → mocks render in pygame windows. Run on a Pi with HATs attached → hardware drivers activate.
+**Slate:** `from inky.auto import auto` > real Inky, or exit on Pi
+**Spark:** `from unicornhatmini import UnicornHATMini` > real LED matrix, or exit on Pi
+**Buttons:** `gpiozero.Button` with `lgpio` pin factory, or exit on Pi
 
 ## Button Mapping
 
-**Slate (Inky Impression 4 buttons, left edge, top to bottom):**
-- A → Subject channel
-- B → Context channel
-- C → Style channel
-- D → Engine channel (loop settings)
+**Slate (Inky Impression, 4 buttons down left edge):**
+- A > Subject channel
+- B > Context channel
+- C > Style channel
+- D > Engine channel
 
-**Spark (Unicorn HAT Mini 4 buttons, corners):**
-- A (top-left) → Previous option
-- B (bottom-left) → Next option
-- X (top-right) → Commit option to sentence
-- Y (bottom-right) → Shift mode (reserved for future)
+**Spark (Unicorn HAT Mini, 4 buttons at corners):**
+- A (top-left) > Previous option
+- B (bottom-left) > Next option
+- X (top-right) > Commit option to sentence
+- Y (bottom-right) > Shift mode
 
 See `docs/02-interaction-model.md` for full button semantics.
 
-## Stopping Services
+## Managing Services
 
 ```bash
-# On Slate
-sudo systemctl stop flyball-slate
+# Stop
+sudo systemctl stop flyball-slate   # or flyball-spark
 
-# On Spark
-sudo systemctl stop flyball-spark
-```
-
-## Disabling Auto-Start
-
-```bash
-# On Slate
+# Disable auto-start
 sudo systemctl disable flyball-slate
 
-# On Spark
-sudo systemctl disable flyball-spark
+# Re-deploy code changes
+cd ~/flyball
+git pull
+sudo systemctl restart flyball-slate  # or flyball-spark
 ```
 
 ## Troubleshooting
 
 ### Spark can't connect to Slate
 
-**Check mDNS resolution:**
 ```bash
-# On Spark
 ping flyball-slate.local
 ```
 
-If fails, try IP directly:
+If fails, override with IP:
 ```bash
-# Find Slate IP
-hostname -I  # run on Slate
+# Find Slate IP (run on Slate)
+hostname -I
 
-# Override on Spark
+# On Spark
 export FLYBALL_CONDUCTOR_HOST=192.168.1.42
 venv/bin/python -m controller
 ```
 
-**Check firewall:**
-Slate must allow incoming TCP 8765:
+Slate must allow TCP 8765: `sudo ufw allow 8765/tcp`
+
+### lgpio not found / GPIO errors
+
 ```bash
-# On Slate
-sudo ufw allow 8765/tcp
+make setup-pi   # installs python3-lgpio, enables SPI/I2C
+sudo reboot
+make clean
+make setup
 ```
 
 ### Service won't start
 
-**Check logs:**
 ```bash
 sudo journalctl -u flyball-slate -n 50
 ```
 
 Common issues:
-- Missing `word_blocks.json` → ensure `shared/data/word_blocks.json` exists
-- Python import errors → re-run `make setup`
-- GPIO permission denied → service runs as `pi` user, should have GPIO access by default
+- Missing `word_blocks.json` > ensure `shared/data/word_blocks.json` exists
+- GPIO permission denied > service runs as `pi` user, add to `gpio` group if needed
+- lgpio not found > run `make setup-pi` and reboot
 
 ### Display not updating
 
-**Slate (Inky):**
-- Inky refresh takes ~30–40s, check logs for "Rendering frame" messages
-- Verify Inky HAT seated correctly on GPIO header
-
-**Spark (Unicorn HAT Mini):**
-- Check logs for "Updating Spark display" messages
-- Verify HAT seated correctly and I2C enabled:
-```bash
-sudo raspi-config
-# Interface Options → I2C → Enable
-```
-
-### Re-deploying Code Changes
-
-```bash
-cd ~/flyball
-git pull
-sudo systemctl restart flyball-slate  # or flyball-spark
-```
-
-Services run from `~/flyball` — no separate install step needed after initial `make install`.
+**Slate:** Inky refresh takes ~30-40s. Check logs for render messages.
+**Spark:** Check HAT is seated. Verify I2C: `sudo i2cdetect -y 1`
 
 ## Network Architecture
 
 ```
-┌──────────────────┐         WebSocket          ┌──────────────────┐
-│  Spark (client)  │  ─────────────────────────>│  Slate (server)  │
-│                  │                             │                  │
-│ Unicorn HAT Mini │<────────────────────────────│ Inky Impression  │
-│ 17×7 RGB + 4 btn │     JSON state messages    │ 640×400 + 4 btn  │
-│                  │                             │                  │
-│ flyball-spark    │                             │ flyball-slate    │
-│   .local:*       │                             │   .local:8765    │
-└──────────────────┘                             └──────────────────┘
-        │                                                 │
-        └─────────────────── LAN ──────────────────────┘
++------------------+         WebSocket          +------------------+
+|  Spark (client)  |  ________________________> |  Slate (server)  |
+|                  |                             |                  |
+| Unicorn HAT Mini | <_________________________ | Inky Impression  |
+| 17x7 RGB + 4 btn |     JSON state messages    | 640x400 + 4 btn  |
+|                  |                             |                  |
+| flyball-spark    |                             | flyball-slate    |
+|   .local         |                             |   .local:8765    |
++------------------+                             +------------------+
+        |                                                 |
+        +---------------------- LAN ----------------------+
 ```
 
 - Slate binds `:8765` and serves WebSocket
 - Spark resolves `flyball-slate.local` via mDNS (avahi) and connects
 - All state authority on Slate; Spark is a thin LED+button UI
-
-## Next Steps
-
-- Configure image generation API key (M2): see `docs/04-prompt-engine.md`
-- Enable evolution loop (M3): ENGINE channel → Loop=ON
-- Add boot resilience (M5): state persistence across reboots
-
-See `docs/05-roadmap.md` for milestone progress.
