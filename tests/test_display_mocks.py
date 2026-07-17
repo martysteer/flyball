@@ -72,7 +72,7 @@ def test_inky_mock_renders_without_crash():
         mode="word",
     )
 
-    mock = InkyMock(width=640, height=400)
+    mock = InkyMock()
     mock.render(state)
     # InkyMock generates a PIL image; just verify no crash
     mock.close()
@@ -90,7 +90,7 @@ def test_inky_mock_renders_sentence():
         mode="word",
     )
 
-    mock = InkyMock(width=640, height=400)
+    mock = InkyMock()
     mock.render(state)
     # Verify pygame screen was created
     assert mock.screen is not None
