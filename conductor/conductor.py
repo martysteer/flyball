@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Optional
 
 from conductor.state_machine import ChannelRegistry, StateSnapshot
-from conductor.display import InkyMock, SlateDisplay
-from conductor.buttons import KeyboardListener
+from conductor.display import InkyMock, SlateDisplay, HAS_INKY
+from conductor.buttons import KeyboardListener, GPIOButtonListener, HAS_GPIO
 from shared.bus_websocket import WebSocketServer
 from shared.messages import ButtonMessage, StateMessage, PongMessage
-from shared.config import IS_SIMULATION
 from shared.keymap import Keymap, normalize_action
+from shared.basic_image_backend import BasicImageBackend
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +25,17 @@ class Conductor:
         """Initialize Conductor."""
         self.registry = ChannelRegistry(word_blocks_path)
         self.bus = WebSocketServer()
-        self.display = InkyMock() if IS_SIMULATION else SlateDisplay()
-        self.loop = None  # Store event loop for thread-safe scheduling
-        self.buttons: Optional[KeyboardListener] = None
-        self.server_running = True  # Track server state for exit
+        self.display = SlateDisplay()
+        self.image_backend = BasicImageBackend()
+        self.loop = None
+        self.buttons: Optional[GPIOButtonListener] = None
+        self.server_running = True
 
         # Load keymaps
         self.spark_keymap = Keymap.load(KEYMAPS_DIR / "spark.json")
         self.slate_keymap = Keymap.load(KEYMAPS_DIR / "slate.json")
 
-        # Action handlers — keyed by action name from keymap JSON
+        # Action handlers
         self.actions = {
             "prev": lambda: self.registry.button_prev(),
             "next": lambda: self.registry.button_next(),
@@ -51,16 +52,21 @@ class Conductor:
 
     async def start(self, host: str, port: int) -> None:
         """Start WebSocket server and display."""
-        self.loop = asyncio.get_running_loop()  # Capture loop for thread-safe calls
+        self.loop = asyncio.get_running_loop()
         await self.bus.start(host, port)
 
-        # Wire keyboard input
-        if IS_SIMULATION and hasattr(self.display, 'on_key'):
-            # Pygame displays handle keyboard directly
-            self.display.on_key = self._on_key
+        # Wire input: pygame keyboard in sim, GPIO on hardware
+        if not HAS_GPIO and hasattr(self.display, 'on_key') and self.display.on_key is not None or not HAS_GPIO:
+            # Simulation — try pygame keys first
+            if hasattr(self.display, 'on_key'):
+                self.display.on_key = self._on_key
+            else:
+                self.buttons = GPIOButtonListener(device="slate", on_exit=self._on_exit_signal)
+                self.buttons.on(self._on_slate_button)
+                self.buttons.start()
         else:
-            # Hardware: use GPIO button listener
-            self.buttons = KeyboardListener(device="slate", on_exit=self._on_exit_signal)
+            # Hardware GPIO
+            self.buttons = GPIOButtonListener(device="slate", on_exit=self._on_exit_signal)
             self.buttons.on(self._on_slate_button)
             self.buttons.start()
 
@@ -75,7 +81,6 @@ class Conductor:
     def _on_hello(self, msg: dict) -> None:
         """Handle hello from Controller."""
         logger.info(f"Controller connected: {msg.get('device')} fw {msg.get('fw')}")
-        # Send current state snapshot
         self._broadcast_state()
 
     def _dispatch(self, keymap: Keymap, btn: str, event: str, label: str) -> None:
@@ -88,7 +93,7 @@ class Conductor:
         action, params = normalize_action(raw)
         handler = self.actions.get(action)
         if handler:
-            print(f"[{label}] {btn} → {action}{(' ' + str(params)) if params else ''}", flush=True)
+            print(f"[{label}] {btn} -> {action}{(' ' + str(params)) if params else ''}", flush=True)
             handler(**params)
             self._broadcast_state()
 
@@ -106,7 +111,6 @@ class Conductor:
 
     def _on_key(self, char: str) -> None:
         """Handle key press from pygame display."""
-        # Map char to button name (physical layer — not keymap concern)
         key_map = {'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D'}
         if char == 'q':
             self._on_exit_signal()
@@ -149,5 +153,6 @@ class Conductor:
         )
         self._schedule(self.bus.send(msg.model_dump()))
 
-        # Also render to Slate display
-        self.display.render(snapshot)
+        # Render to Slate display via BasicImageBackend
+        frame = self.image_backend.render_frame(snapshot)
+        self.display.render_image(frame)
