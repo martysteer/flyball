@@ -32,17 +32,21 @@ setup-pi:
 	@echo ""
 	@echo "=== Installing Pimoroni Inky (Slate display) ==="
 	@echo ""
-	rm -rf /tmp/pimoroni-inky
-	git clone --depth 1 https://github.com/pimoroni/inky /tmp/pimoroni-inky
-	cd /tmp/pimoroni-inky && yes y | ./install.sh
-	rm -rf /tmp/pimoroni-inky
+	@if [ ! -d "$$HOME/inky" ]; then \
+		git clone --depth 1 https://github.com/pimoroni/inky $$HOME/inky; \
+	else \
+		echo "$$HOME/inky already exists, skipping clone"; \
+	fi
+	cd $$HOME/inky && yes y | ./install.sh
 	@echo ""
 	@echo "=== Installing Pimoroni Unicorn HAT Mini (Spark display) ==="
 	@echo ""
-	rm -rf /tmp/pimoroni-unicorn
-	git clone --depth 1 https://github.com/pimoroni/unicornhatmini-python /tmp/pimoroni-unicorn
-	cd /tmp/pimoroni-unicorn && yes y | ./install.sh
-	rm -rf /tmp/pimoroni-unicorn
+	@if [ ! -d "$$HOME/unicornhatmini-python" ]; then \
+		git clone --depth 1 https://github.com/pimoroni/unicornhatmini-python $$HOME/unicornhatmini-python; \
+	else \
+		echo "$$HOME/unicornhatmini-python already exists, skipping clone"; \
+	fi
+	cd $$HOME/unicornhatmini-python && yes y | ./install.sh
 	@echo ""
 	@echo "✓ Pimoroni drivers installed."
 	@echo "  REBOOT REQUIRED: sudo reboot"
