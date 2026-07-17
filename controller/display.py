@@ -1,134 +1,130 @@
-"""SparkDisplay seam + terminal ANSI mock. Real Unicorn HAT Mini lands in M4."""
+"""Spark display: real Unicorn HAT Mini + mock (ANSI terminal 17×7)."""
+
+import os
 import sys
+from dataclasses import dataclass
+from typing import Optional
+import platform
 
-W, H = 17, 7
+from shared.interfaces.display import Display, StateSnapshot
 
-# 3x5 pixel font, rows 2-6. '#'=lit. Unknown chars render as space.
-FONT = {
-    "A": [".#.", "#.#", "###", "#.#", "#.#"],
-    "B": ["##.", "#.#", "##.", "#.#", "##."],
-    "C": [".##", "#..", "#..", "#..", ".##"],
-    "D": ["##.", "#.#", "#.#", "#.#", "##."],
-    "E": ["###", "#..", "##.", "#..", "###"],
-    "F": ["###", "#..", "##.", "#..", "#.."],
-    "G": [".##", "#..", "#.#", "#.#", ".##"],
-    "H": ["#.#", "#.#", "###", "#.#", "#.#"],
-    "I": ["###", ".#.", ".#.", ".#.", "###"],
-    "J": ["..#", "..#", "..#", "#.#", ".#."],
-    "K": ["#.#", "#.#", "##.", "#.#", "#.#"],
-    "L": ["#..", "#..", "#..", "#..", "###"],
-    "M": ["#.#", "###", "###", "#.#", "#.#"],
-    "N": ["#.#", "###", "###", "###", "#.#"],
-    "O": [".#.", "#.#", "#.#", "#.#", ".#."],
-    "P": ["##.", "#.#", "##.", "#..", "#.."],
-    "Q": [".#.", "#.#", "#.#", ".#.", "..#"],
-    "R": ["##.", "#.#", "##.", "#.#", "#.#"],
-    "S": [".##", "#..", ".#.", "..#", "##."],
-    "T": ["###", ".#.", ".#.", ".#.", ".#."],
-    "U": ["#.#", "#.#", "#.#", "#.#", "###"],
-    "V": ["#.#", "#.#", "#.#", "#.#", ".#."],
-    "W": ["#.#", "#.#", "###", "###", "#.#"],
-    "X": ["#.#", "#.#", ".#.", "#.#", "#.#"],
-    "Y": ["#.#", "#.#", ".#.", ".#.", ".#."],
-    "Z": ["###", "..#", ".#.", "#..", "###"],
-    "0": [".#.", "#.#", "#.#", "#.#", ".#."],
-    "1": [".#.", "##.", ".#.", ".#.", "###"],
-    "2": ["##.", "..#", ".#.", "#..", "###"],
-    "3": ["###", "..#", ".#.", "..#", "##."],
-    "4": ["#.#", "#.#", "###", "..#", "..#"],
-    "5": ["###", "#..", "##.", "..#", "##."],
-    "6": [".##", "#..", "##.", "#.#", ".#."],
-    "7": ["###", "..#", ".#.", ".#.", ".#."],
-    "8": [".#.", "#.#", ".#.", "#.#", ".#."],
-    "9": [".#.", "#.#", ".##", "..#", "##."],
-    "-": ["...", "...", "###", "...", "..."],
-    "+": ["...", ".#.", "###", ".#.", "..."],
-    "'": [".#.", ".#.", "...", "...", "..."],
-    ".": ["...", "...", "...", "...", ".#."],
-    " ": ["...", "...", "...", "...", "..."],
-}
+IS_SIMULATION = platform.system() != "Linux"
+
+# ANSI colour codes
+ANSI_BLACK = "\033[40m"
+ANSI_RED = "\033[41m"
+ANSI_GREEN = "\033[42m"
+ANSI_YELLOW = "\033[43m"
+ANSI_BLUE = "\033[44m"
+ANSI_MAGENTA = "\033[45m"
+ANSI_CYAN = "\033[46m"
+ANSI_WHITE = "\033[47m"
+ANSI_RESET = "\033[0m"
+ANSI_BRIGHT = "\033[1m"
+
+# Map RGB to ANSI colour (naive)
+def rgb_to_ansi(rgb: tuple) -> str:
+    """Convert (r, g, b) to closest ANSI colour."""
+    r, g, b = rgb
+    if r > 100 and g > 100 and b > 100:
+        return ANSI_WHITE
+    elif r > 150 and g < 100 and b < 100:
+        return ANSI_RED
+    elif g > 150 and r < 100 and b < 100:
+        return ANSI_GREEN
+    elif b > 150 and r < 100 and g < 100:
+        return ANSI_BLUE
+    elif r > 150 and g > 100 and b < 100:
+        return ANSI_YELLOW
+    elif r > 150 and b > 100 and g < 100:
+        return ANSI_MAGENTA
+    elif g > 100 and b > 100 and r < 100:
+        return ANSI_CYAN
+    else:
+        return ANSI_BLACK
 
 
-def text_columns(text):
-    """Render text to a list of 5-bit columns (list of 5-char strings)."""
-    cols = []
-    for ch in text.upper():
-        glyph = FONT.get(ch, FONT[" "])
-        for x in range(3):
-            cols.append("".join(glyph[y][x] for y in range(5)))
-        cols.append(".....")  # 1-col letter gap
-    return cols
+@dataclass
+class SparkMock(Display):
+    """Mock Spark display: renders 17×7 ANSI matrix to terminal."""
+
+    width: int = 17
+    height: int = 7
+    scroll_pos: int = 0  # For scrolling text
+
+    def render(self, state: StateSnapshot) -> None:
+        """Render state to terminal."""
+        # Build 17×7 matrix
+        matrix = [[" " for _ in range(self.width)] for _ in range(self.height)]
+
+        color = rgb_to_ansi(state.channel_color)
+
+        # Row 0: colour bar (full width, dim)
+        for x in range(self.width):
+            matrix[0][x] = "▄"  # Half-block
+
+        # Row 1: position pips
+        pip_char = "●"  # Bright dot at current index
+        dim_pip = "○"   # Dim dots for others
+        if state.option_count > 0:
+            for i in range(min(state.option_count, self.width)):
+                matrix[1][i] = pip_char if i == state.option_index else dim_pip
+
+        # Rows 2–6: text (two-line layout: rows 2–4, gap, rows 6)
+        # For now: rows 2–4 = line 1, row 5 = spacer, row 6 = line 2
+        text_to_render = state.candidate
+
+        if state.mode == "engine":
+            # Engine channel: show operator icon + setting
+            text_line_1 = f"[{state.engine['operator'].upper()}]"
+            text_line_2 = f"Speed: {state.engine['speed_s']}s"
+        else:
+            # Word channel: scroll text
+            # Simple scrolling: use scroll_pos to advance
+            text_with_padding = text_to_render + "  " + text_to_render
+            text_line_1 = text_with_padding[self.scroll_pos:self.scroll_pos + 17]
+            text_line_2 = ""  # Second line can be empty or show more info
+            self.scroll_pos = (self.scroll_pos + 1) % len(text_with_padding)
+
+        # Render lines to matrix
+        # Line 1: rows 2–4 (but fit into a 3-row height)
+        for i, ch in enumerate(text_line_1[:17]):
+            matrix[2][i] = ch
+
+        # Line 2: row 6
+        if text_line_2:
+            for i, ch in enumerate(text_line_2[:17]):
+                matrix[6][i] = ch
+
+        # Render to terminal
+        os.system("clear" if os.name == "posix" else "cls")
+        print(f"\n{color}Spark 17×7 Mock — Channel: {state.channel.upper()}{ANSI_RESET}\n")
+
+        # Print matrix
+        for row in matrix:
+            row_str = "".join(row)
+            print(f"  {color}█{ANSI_RESET} {row_str} {color}█{ANSI_RESET}")
+
+        print()
+
+    def close(self) -> None:
+        """Clean up."""
+        pass
 
 
-class SparkDisplay:
-    """Display seam for the fast controller."""
+class SparkDisplay(Display):
+    """Real Spark display (Unicorn HAT Mini on GPIO)."""
 
-    def set_state(self, msg):
-        raise NotImplementedError
+    def render(self, state: StateSnapshot) -> None:
+        """Render to Unicorn HAT Mini (stub for M1)."""
+        if IS_SIMULATION:
+            # Fall back to mock
+            mock = SparkMock()
+            mock.render(state)
+        else:
+            # TODO: implement real Unicorn HAT rendering
+            pass
 
-    def tick(self):
-        raise NotImplementedError
-
-
-class SparkMock(SparkDisplay):
-    """17x7 terminal matrix: colour bar, pips, scrolling candidate."""
-
-    FLASH_TICKS = 4
-
-    def __init__(self, out=sys.stdout):
-        self.out = out
-        self.state = None
-        self.offset = -W  # scroll start: text enters from the right
-        self.flash = 0
-        out.write("\x1b[2J\x1b[?25l")  # clear screen, hide cursor
-
-    def set_state(self, msg):
-        prev = self.state
-        if prev is None or msg["candidate"] != prev["candidate"]:
-            self.offset = -W
-        if msg.get("committed") and not (prev and prev.get("committed")) \
-                and prev and msg["candidate"] == prev["candidate"]:
-            self.flash = self.FLASH_TICKS  # commit felt, not just seen
-        self.state = msg
-
-    def _grid(self):
-        """Build H rows x W cols of (r,g,b)."""
-        s = self.state
-        grid = [[(0, 0, 0)] * W for _ in range(H)]
-        if s is None:
-            return grid
-        r, g, b = s["channel_color"]
-        if self.flash > 0:
-            self.flash -= 1
-            return [[(r, g, b)] * W for _ in range(H)]
-        dim = (r // 5, g // 5, b // 5)
-        grid[0] = [dim] * W                                   # row 0: colour bar
-        n, idx = s["option_count"], s["option_index"]
-        for i in range(min(n, W)):                            # row 1: pips
-            grid[1][i] = (r, g, b) if i == idx else (r // 8, g // 8, b // 8)
-        cols = text_columns(s["candidate"])                   # rows 2-6: scroll
-        for x in range(W):
-            src = x + self.offset
-            if 0 <= src < len(cols):
-                for y in range(5):
-                    if cols[src][y] == "#":
-                        grid[2 + y][x] = (r, g, b)
-        self.offset += 1
-        if self.offset > len(cols):
-            self.offset = -W
-        return grid
-
-    def tick(self):
-        grid = self._grid()
-        lines = ["\x1b[H"]  # cursor home
-        for row in grid:
-            lines.append("".join(f"\x1b[48;2;{r};{g};{b}m  " for r, g, b in row)
-                         + "\x1b[0m")
-        s = self.state or {}
-        lines.append(f"\x1b[0m\x1b[K{s.get('channel', '?'):>8} "
-                     f"{s.get('candidate', '')!r} "
-                     f"[{s.get('option_index', 0) + 1}/{s.get('option_count', 0)}]"
-                     f"{' committed' if s.get('committed') else ''}")
-        lines.append("\x1b[Ka=prev b=next x=commit y=shift q=quit")
-        self.out.write("\r\n".join(lines) + "\r\n")
-        self.out.flush()
+    def close(self) -> None:
+        """Clean up GPIO."""
+        pass
