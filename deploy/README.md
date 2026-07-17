@@ -14,8 +14,10 @@ sudo reboot
 # 2. Clone repo
 cd ~ && git clone https://github.com/YOUR_USERNAME/flyball.git && cd flyball
 
-# 3. Install Pimoroni hardware drivers (one-time, answers all prompts automatically)
+# 3. Install Pimoroni hardware drivers (one-time)
 make setup-pi
+# When prompted to install examples, press Y — lets you test hardware separately from Flyball
+# Examples install to ~/Pimoroni/inky and ~/Pimoroni/unicornhatmini
 sudo reboot
 
 # 4. Install Flyball app dependencies
