@@ -35,7 +35,9 @@ def test_spark_display_falls_back_to_mock():
 
 
 def test_spark_mock_render_no_crash():
-    """SparkMock.render() doesn't crash."""
+    """SparkMock.push() doesn't crash."""
     from controller.display import SparkMock
+    from controller.render import render_frame
     mock = SparkMock()
-    mock.render(_make_state())
+    frame = render_frame(_make_state(), tick=0)
+    mock.push(frame)

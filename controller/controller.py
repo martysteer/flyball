@@ -6,6 +6,7 @@ from typing import Optional
 
 from controller.display import SparkDisplay, HAS_UNICORN
 from controller.buttons import GPIOButtonListener, HAS_GPIO
+from controller.render import render_frame
 from shared.bus_websocket import WebSocketClient
 from shared.messages import HelloMessage, StateMessage, PingMessage, ButtonMessage
 from shared.interfaces.display import StateSnapshot
@@ -25,8 +26,8 @@ class Controller:
         self.current_state: Optional[StateSnapshot] = None
         self.loop = None
         self.heartbeat_task = None
-        self.render_queue: asyncio.Queue = asyncio.Queue(maxsize=1)
-        self.render_task: Optional[asyncio.Task] = None
+        self.tick = 0
+        self.ticker_task: Optional[asyncio.Task] = None
 
         # Register bus handlers
         self.bus.on("state", self._on_state)
@@ -56,11 +57,11 @@ class Controller:
             self.buttons.on(self._on_button_event)
             self.buttons.start()
 
-        # Start heartbeat
-        self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-
-        # Start render loop
-        self.render_task = asyncio.create_task(self._render_loop())
+        # Start heartbeat + ticker
+        if not self.heartbeat_task:
+            self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        if not self.ticker_task:
+            self.ticker_task = asyncio.create_task(self._ticker_loop())
 
     async def shutdown(self) -> None:
         """Shut down client."""
@@ -71,10 +72,10 @@ class Controller:
                 await self.heartbeat_task
             except asyncio.CancelledError:
                 pass
-        if self.render_task:
-            self.render_task.cancel()
+        if self.ticker_task:
+            self.ticker_task.cancel()
             try:
-                await self.render_task
+                await self.ticker_task
             except asyncio.CancelledError:
                 pass
         if self.buttons:
@@ -82,17 +83,13 @@ class Controller:
         await self.bus.disconnect()
         self.display.close()
 
-    async def _render_loop(self) -> None:
-        """Background task: consume render queue and update Spark LEDs."""
+    async def _ticker_loop(self) -> None:
+        """~15fps animation ticker: render current state every frame."""
         while self.running:
-            try:
-                state = await self.render_queue.get()
-                logger.debug(f"Rendering Spark: channel={state.channel}")
-                self.display.render(state)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Spark render error: {e}")
+            if self.current_state:
+                self.display.push(render_frame(self.current_state, self.tick))
+            self.tick += 1
+            await asyncio.sleep(1 / 15)
 
     def _on_state(self, msg: dict) -> None:
         """Handle state update from Conductor."""
@@ -107,11 +104,6 @@ class Controller:
             engine=msg.get("engine"),
         )
         self.current_state = state
-        try:
-            self.render_queue.put_nowait(state)
-        except asyncio.QueueFull:
-            self.render_queue.get_nowait()
-            self.render_queue.put_nowait(state)
 
     def _on_patch(self, msg: dict) -> None:
         """Handle incremental state update."""
@@ -123,11 +115,6 @@ class Controller:
             self.current_state.option_index = msg["option_index"]
         if "committed" in msg:
             self.current_state.committed = msg["committed"]
-        try:
-            self.render_queue.put_nowait(self.current_state)
-        except asyncio.QueueFull:
-            self.render_queue.get_nowait()
-            self.render_queue.put_nowait(self.current_state)
 
     def _on_pong(self, msg: dict) -> None:
         """Handle pong from Conductor."""

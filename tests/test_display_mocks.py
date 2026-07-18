@@ -1,7 +1,8 @@
 """Test display mocks."""
 
-from shared.interfaces.display import StateSnapshot, Display
+from shared.interfaces.display import StateSnapshot
 from controller.display import SparkMock
+from controller.render import render_frame
 
 
 def test_spark_mock_renders_without_crash():
@@ -18,7 +19,8 @@ def test_spark_mock_renders_without_crash():
 
     mock = SparkMock()
     # Should not crash
-    mock.render(state)
+    frame = render_frame(state, tick=0)
+    mock.push(frame)
     mock.close()
 
 
@@ -36,7 +38,8 @@ def test_spark_mock_renders_engine_channel():
     )
 
     mock = SparkMock()
-    mock.render(state)
+    frame = render_frame(state, tick=0)
+    mock.push(frame)
     mock.close()
 
 
@@ -55,7 +58,8 @@ def test_spark_mock_scrolls_long_text():
     mock = SparkMock()
     # Render multiple times to show scrolling
     for i in range(5):
-        mock.render(state)
+        frame = render_frame(state, tick=i * 10)
+        mock.push(frame)
     mock.close()
 from conductor.display import InkyMock
 
