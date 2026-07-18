@@ -144,9 +144,9 @@ class Controller:
         print(f"[Spark] {btn} {kind}", flush=True)
         s = self.local
         if btn == "A":
-            s.prev_option()          # long: jump -5 (S5)
+            s.jump(-5) if kind == "long" else s.prev_option()
         elif btn == "X":
-            s.next_option()          # long: jump +5 (S5)
+            s.jump(5) if kind == "long" else s.next_option()
         elif btn == "B":
             if kind == "long":
                 s.uncommit()
@@ -156,11 +156,13 @@ class Controller:
                 self.effects.flash_until = self.tick + 2
                 self.effects.flash_color = snap.channel_color
         elif btn == "Y":
-            if kind == "long" and s.active == "engine":
-                self._schedule(self._send())
-            elif kind == "short":
+            if kind == "long":
+                if s.active == "engine":
+                    self._schedule(self._send())
+                else:
+                    s.randomize()
+            else:
                 s.next_channel()
-            # long on non-engine: randomize (S5)
 
     async def _send(self) -> None:
         """Explicit send → Conductor renders e-ink once."""
