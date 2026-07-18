@@ -25,6 +25,11 @@ class SparkMock(Display):
         self.on_key = None  # Callback: (char: str) -> None
         self.unicorn.on_button_pressed(self._on_button_pin)
 
+    def poll_events(self) -> None:
+        """Process pygame events (keyboard + window close)."""
+        if self.unicorn:
+            self.unicorn._process_events()
+
     def render(self, state: StateSnapshot) -> None:
         """Render state to pygame window."""
         if not self.unicorn:
@@ -158,6 +163,11 @@ class SparkDisplay(Display):
     def on_key(self, value):
         if self.mock:
             self.mock.on_key = value
+
+    def poll_events(self) -> None:
+        """Process pygame events (only in sim)."""
+        if self.mock:
+            self.mock.poll_events()
 
     def render(self, state: StateSnapshot) -> None:
         """Render to display."""

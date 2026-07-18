@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -32,7 +31,8 @@ class Conductor:
         self.loop = None
         self.buttons: Optional[GPIOButtonListener] = None
         self.server_running = True
-        self.last_display_update = 0.0  # Timestamp of last e-ink update
+        self.render_queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+        self.render_task: Optional[asyncio.Task] = None
 
         # Load keymaps
         self.spark_keymap = Keymap.load(KEYMAPS_DIR / "spark.json")
@@ -58,6 +58,9 @@ class Conductor:
         self.loop = asyncio.get_running_loop()
         await self.bus.start(host, port)
 
+        # Launch background render task
+        self.render_task = asyncio.create_task(self._render_loop())
+
         # Wire input: pygame keyboard in sim, GPIO on hardware
         if not HAS_GPIO and hasattr(self.display, 'on_key') and self.display.on_key is not None or not HAS_GPIO:
             # Simulation — try pygame keys first
@@ -78,8 +81,27 @@ class Conductor:
 
     async def shutdown(self) -> None:
         """Shut down server."""
+        if self.render_task:
+            self.render_task.cancel()
+            try:
+                await self.render_task
+            except asyncio.CancelledError:
+                pass
         await self.bus.disconnect()
         self.display.close()
+
+    async def _render_loop(self) -> None:
+        """Background task: consume render queue and update display."""
+        while self.server_running:
+            try:
+                frame = await self.render_queue.get()
+                logger.debug("Rendering queued frame")
+                self.display.render_image(frame)
+                logger.debug("Render complete")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Render error: {e}")
 
     def _on_hello(self, msg: dict) -> None:
         """Handle hello from Controller."""
@@ -127,6 +149,7 @@ class Conductor:
     def _schedule(self, coro) -> None:
         """Schedule a coroutine from either the event loop or a thread."""
         if not self.loop:
+            logger.warning("Schedule called before event loop initialized")
             return
         try:
             if asyncio.get_running_loop() == self.loop:
@@ -154,14 +177,18 @@ class Conductor:
             mode=snapshot.mode,
             engine=snapshot.engine,
         )
+
+        # Broadcast to network immediately (fast, non-blocking)
+        logger.debug(f"Broadcasting state: channel={snapshot.channel}")
         self._schedule(self.bus.send(msg.model_dump()))
 
-        # Render to Slate display via BasicImageBackend
+        # Queue render for async background task (non-blocking)
         frame = self.image_backend.render_frame(snapshot)
-
-        # Debounce e-ink updates on hardware (30s refresh blocks buttons)
-        # Only update if: simulation OR 35s+ since last update
-        now = time.time()
-        if IS_SIMULATION or (now - self.last_display_update) >= 35:
-            self.display.render_image(frame)
-            self.last_display_update = now
+        try:
+            self.render_queue.put_nowait(frame)
+            logger.debug("Queued render")
+        except asyncio.QueueFull:
+            # Queue full (render in progress), replace with latest
+            self.render_queue.get_nowait()  # discard old frame
+            self.render_queue.put_nowait(frame)  # add new frame
+            logger.debug("Replaced queued render with latest")

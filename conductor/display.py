@@ -53,14 +53,13 @@ class InkyMock(Display):
         """
         pass
 
-    def render_image(self, img: Image.Image) -> None:
-        """Render a PIL Image to pygame window."""
+    def poll_events(self) -> None:
+        """Process pygame events (keyboard + window close)."""
         if not self.screen or not self._pygame:
             return
 
         pygame = self._pygame
 
-        # Process events (prevent window freeze + handle keyboard)
         try:
             events = pygame.event.get()
         except pygame.error:
@@ -82,6 +81,13 @@ class InkyMock(Display):
                 char = key_map.get(event.key)
                 if char and self.on_key:
                     self.on_key(char)
+
+    def render_image(self, img: Image.Image) -> None:
+        """Render a PIL Image to pygame window."""
+        if not self.screen or not self._pygame:
+            return
+
+        pygame = self._pygame
 
         # Convert PIL Image to pygame surface and blit
         raw = img.tobytes()
@@ -130,6 +136,11 @@ class SlateDisplay(Display):
     def on_key(self, value):
         if self.mock:
             self.mock.on_key = value
+
+    def poll_events(self) -> None:
+        """Process pygame events (only in sim)."""
+        if self.mock:
+            self.mock.poll_events()
 
     def render(self, state: StateSnapshot) -> None:
         """Legacy render — no-op. Use render_image()."""

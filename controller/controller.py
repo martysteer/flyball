@@ -25,6 +25,8 @@ class Controller:
         self.current_state: Optional[StateSnapshot] = None
         self.loop = None
         self.heartbeat_task = None
+        self.render_queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+        self.render_task: Optional[asyncio.Task] = None
 
         # Register bus handlers
         self.bus.on("state", self._on_state)
@@ -53,6 +55,9 @@ class Controller:
         # Start heartbeat
         self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
+        # Start render loop
+        self.render_task = asyncio.create_task(self._render_loop())
+
     async def shutdown(self) -> None:
         """Shut down client."""
         self.running = False
@@ -62,10 +67,28 @@ class Controller:
                 await self.heartbeat_task
             except asyncio.CancelledError:
                 pass
+        if self.render_task:
+            self.render_task.cancel()
+            try:
+                await self.render_task
+            except asyncio.CancelledError:
+                pass
         if self.buttons:
             self.buttons.stop()
         await self.bus.disconnect()
         self.display.close()
+
+    async def _render_loop(self) -> None:
+        """Background task: consume render queue and update Spark LEDs."""
+        while self.running:
+            try:
+                state = await self.render_queue.get()
+                logger.debug(f"Rendering Spark: channel={state.channel}")
+                self.display.render(state)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Spark render error: {e}")
 
     def _on_state(self, msg: dict) -> None:
         """Handle state update from Conductor."""
@@ -80,7 +103,11 @@ class Controller:
             engine=msg.get("engine"),
         )
         self.current_state = state
-        self.display.render(state)
+        try:
+            self.render_queue.put_nowait(state)
+        except asyncio.QueueFull:
+            self.render_queue.get_nowait()
+            self.render_queue.put_nowait(state)
 
     def _on_patch(self, msg: dict) -> None:
         """Handle incremental state update."""
@@ -92,7 +119,11 @@ class Controller:
             self.current_state.option_index = msg["option_index"]
         if "committed" in msg:
             self.current_state.committed = msg["committed"]
-        self.display.render(self.current_state)
+        try:
+            self.render_queue.put_nowait(self.current_state)
+        except asyncio.QueueFull:
+            self.render_queue.get_nowait()
+            self.render_queue.put_nowait(self.current_state)
 
     def _on_pong(self, msg: dict) -> None:
         """Handle pong from Conductor."""
@@ -113,6 +144,7 @@ class Controller:
     def _schedule(self, coro) -> None:
         """Schedule a coroutine from either the event loop or a thread."""
         if not self.loop:
+            logger.warning("Schedule called before event loop initialized")
             return
         try:
             if asyncio.get_running_loop() == self.loop:

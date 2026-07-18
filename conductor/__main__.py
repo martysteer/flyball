@@ -32,15 +32,12 @@ async def main():
 
         # Keep running and process events
         if IS_SIMULATION:
-            # Simulation: constantly re-render to process pygame keyboard events
+            # Simulation: poll pygame for keyboard events
             while conductor.server_running:
-                snapshot = StateSnapshot.from_registry(conductor.registry, mode="word")
-                frame = conductor.image_backend.render_frame(snapshot)
-                conductor.display.render_image(frame)
+                conductor.display.poll_events()  # process pygame events
                 await asyncio.sleep(0.05)  # ~20 FPS
         else:
-            # Hardware: just wait for GPIO button events (no constant re-render needed)
-            # Display updates happen in _broadcast_state() when state changes
+            # Hardware: just wait for GPIO button events
             while conductor.server_running:
                 await asyncio.sleep(1)
 

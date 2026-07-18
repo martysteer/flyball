@@ -25,11 +25,9 @@ async def main():
 
         # Keep running and process events
         while controller.running:
-            # Re-render to process pygame events (keyboard, window close)
-            if controller.current_state:
-                controller.display.render(controller.current_state)
-            elif hasattr(controller.display, 'mock') and controller.display.mock:
-                controller.display.mock.unicorn.show()  # pump events before first state
+            # Poll pygame events in simulation
+            if IS_SIMULATION and hasattr(controller.display, 'poll_events'):
+                controller.display.poll_events()
             await asyncio.sleep(0.05)  # ~20 FPS event processing
 
     except KeyboardInterrupt:

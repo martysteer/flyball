@@ -142,9 +142,6 @@ class UnicornHATMiniBase:
     
     def show(self):
         """Update the display."""
-        # Process any pending events
-        self._process_events()
-        
         # Draw each pixel
         for x in range(self.WIDTH):
             for y in range(self.HEIGHT):
