@@ -30,4 +30,4 @@ def get_word_blocks_path() -> Path:
 def get_spark_brightness() -> float:
     """Unicorn HAT brightness 0.0–1.0. Default dim per spec."""
     # ponytail: env-only knob, calibrate on hardware
-    return float(os.getenv("FLYBALL_SPARK_BRIGHTNESS", "0.2"))
+    return float(os.getenv("FLYBALL_SPARK_BRIGHTNESS", "0.1"))

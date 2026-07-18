@@ -55,8 +55,8 @@ FONT = {
 }
 
 
-def render_columns(text: str) -> list:
-    """Concatenate glyph columns with 1 blank column between chars."""
+def render_columns(text: str, padding: int = 0) -> list:
+    """Concatenate glyph columns with 1 blank column between chars, optional padding."""
     cols = []
     for ch in text.upper():
         glyph = FONT.get(ch)
@@ -65,6 +65,8 @@ def render_columns(text: str) -> list:
         if cols:
             cols.append(0)
         cols.extend(glyph)
+    if padding > 0:
+        cols = [0] * padding + cols + [0] * padding
     return cols
 
 
@@ -73,15 +75,17 @@ def text_width(text: str) -> int:
     return len(render_columns(text))
 
 
-def bounce_offset(total_cols: int, window: int, tick: int, ticks_per_col: int = 5) -> int:
-    """Triangle-wave scroll offset: left until end visible, then reverse.
+def bounce_offset(total_cols: int, window: int, tick: int, ticks_per_col: int = 3, dwell_ticks: int = 20) -> int:
+    """Triangle-wave scroll offset: dwell at start, scroll left/right.
 
-    At 15fps, ticks_per_col=5 → 3 cols/s (medium speed per spec).
+    At 20fps, ticks_per_col=3 → ~6.7 cols/s. Dwell 20 ticks = 1s at 20fps.
     """
     max_off = total_cols - window
     if max_off <= 0:
         return 0
-    step = tick // ticks_per_col
+    if tick < dwell_ticks:
+        return 0  # dwell at start before scrolling
+    step = (tick - dwell_ticks) // ticks_per_col
     period = 2 * max_off
     pos = step % period
     return pos if pos <= max_off else period - pos

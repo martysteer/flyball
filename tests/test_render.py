@@ -42,10 +42,10 @@ def test_row1_pip_bright_at_index():
 
 
 def test_text_pixels_short_word_static():
-    # 'H' col 0 has top bit set → pixel at (row 2, col 0)
+    # padding=5, so 'H' col 0 → frame col 5; H first col has top bit set
     frame = render_frame(make_state(candidate="HI"), tick=0)
-    assert frame[2][0] == (0, 200, 80)
-    assert frame[2][3] == (0, 0, 0)  # gap column
+    assert frame[2][5] == (0, 200, 80)  # H's first column after padding
+    assert frame[2][0] == (0, 0, 0)    # padding column
 
 
 def test_long_word_scrolls_with_tick():
@@ -60,5 +60,5 @@ def test_engine_mode_shows_candidate_text():
                        channel_color=(200, 150, 0), candidate="SEND",
                        engine={"operator": "swap"})
     frame = render_frame(state, tick=0)
-    # 'S' col 0: rows 011/100/010/001/110 → bit1,bit4 → pixel at row 3 col 0
-    assert frame[3][0] == (200, 150, 0)
+    # padding=5, 'S' first col at frame col 5; 'S' col 0: bit1,bit4 set → rows 3,4
+    assert frame[3][5] == (200, 150, 0)

@@ -48,15 +48,31 @@ def test_bounce_static_when_text_fits():
 
 
 def test_bounce_scrolls_to_max_then_back():
-    # 20 cols in 17 window → max offset 3; ticks_per_col=5
-    assert bounce_offset(20, 17, tick=0) == 0
-    assert bounce_offset(20, 17, tick=5) == 1
-    assert bounce_offset(20, 17, tick=15) == 3   # end visible
-    assert bounce_offset(20, 17, tick=20) == 2   # reversing
-    assert bounce_offset(20, 17, tick=30) == 0   # back at start
+    # 20 cols in 17 window → max offset 3; ticks_per_col=5, no dwell
+    assert bounce_offset(20, 17, tick=0, ticks_per_col=5, dwell_ticks=0) == 0
+    assert bounce_offset(20, 17, tick=5, ticks_per_col=5, dwell_ticks=0) == 1
+    assert bounce_offset(20, 17, tick=15, ticks_per_col=5, dwell_ticks=0) == 3   # end visible
+    assert bounce_offset(20, 17, tick=20, ticks_per_col=5, dwell_ticks=0) == 2   # reversing
+    assert bounce_offset(20, 17, tick=30, ticks_per_col=5, dwell_ticks=0) == 0   # back at start
 
 
 def test_bounce_never_exceeds_bounds():
     for tick in range(200):
-        off = bounce_offset(40, 17, tick)
+        off = bounce_offset(40, 17, tick, dwell_ticks=0)
         assert 0 <= off <= 23
+
+
+def test_render_columns_with_padding():
+    # "HI" = 5 cols; padding=3 → [0,0,0] + cols + [0,0,0] = 11 cols
+    cols = render_columns("HI", padding=3)
+    assert cols[:3] == [0, 0, 0]
+    assert cols[-3:] == [0, 0, 0]
+    assert len(cols) == 5 + 3 + 3
+
+
+def test_bounce_dwells_at_start():
+    # dwell_ticks=10 → offset stays 0 for first 10 ticks
+    assert bounce_offset(30, 17, tick=0, dwell_ticks=10) == 0
+    assert bounce_offset(30, 17, tick=9, dwell_ticks=10) == 0
+    assert bounce_offset(30, 17, tick=10, dwell_ticks=10) == 0  # step=2, starts moving
+    assert bounce_offset(30, 17, tick=15, dwell_ticks=10) == 1

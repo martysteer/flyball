@@ -27,6 +27,7 @@ class Controller:
         self.loop = None
         self.heartbeat_task = None
         self.tick = 0
+        self.last_candidate = ""
         self.ticker_task: Optional[asyncio.Task] = None
 
         # Register bus handlers
@@ -84,12 +85,16 @@ class Controller:
         self.display.close()
 
     async def _ticker_loop(self) -> None:
-        """~15fps animation ticker: render current state every frame."""
+        """20fps animation ticker: render current state, reset tick on text change."""
         while self.running:
             if self.current_state:
+                # Reset tick when text changes (dwell at start of each new text)
+                if self.current_state.candidate != self.last_candidate:
+                    self.tick = 0
+                    self.last_candidate = self.current_state.candidate
                 self.display.push(render_frame(self.current_state, self.tick))
             self.tick += 1
-            await asyncio.sleep(1 / 15)
+            await asyncio.sleep(1 / 20)
 
     def _on_state(self, msg: dict) -> None:
         """Handle state update from Conductor."""
