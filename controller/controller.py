@@ -89,9 +89,14 @@ class Controller:
     async def _ticker_loop(self) -> None:
         """30fps animation ticker: long-press poll + render."""
         while self.running:
+            now = time.monotonic()
             # Poll long-press detector
-            for btn in self.detector.poll(time.monotonic()):
+            for btn in self.detector.poll(now):
                 self._on_gesture(btn, "long")
+            # Growing glint tracks longest-held button
+            held = min(self.detector.down, key=self.detector.down.get, default="")
+            self.effects.hold_btn = held
+            self.effects.hold_frac = self.detector.hold_fraction(held, now) if held else 0.0
             snap = self.local.snapshot()
             # Reset tick when text changes (dwell at start of each new text)
             if snap.candidate != self.last_candidate:
@@ -135,6 +140,8 @@ class Controller:
         now = time.monotonic()
         if event == "press":
             self.detector.press(btn, now)
+            self.effects.glint_until = self.tick + 1
+            self.effects.glint_btn = btn
         elif event == "release":
             if self.detector.release(btn, now) == "short":
                 self._on_gesture(btn, "short")

@@ -89,3 +89,18 @@ def test_flash_expires():
     e = Effects(flash_until=2, flash_color=(0, 200, 80))
     frame = render_frame(make_state(candidate="HI"), tick=2, effects=e)
     assert frame[2][3] == (0, 0, 0)  # normal render resumed
+
+
+def test_press_glint_left_top_for_a():
+    e = Effects(glint_until=1, glint_btn="A")
+    frame = render_frame(make_state(), tick=0, effects=e)
+    assert frame[0][0] == (255, 255, 255)
+    assert frame[2][0] == (255, 255, 255)
+    assert frame[6][0] != (255, 255, 255)  # bottom half untouched
+
+
+def test_hold_glint_grows():
+    e = Effects(hold_btn="Y", hold_frac=1.0)
+    frame = render_frame(make_state(), tick=0, effects=e)
+    assert frame[4][16] == (255, 255, 255)
+    assert frame[6][16] == (255, 255, 255)

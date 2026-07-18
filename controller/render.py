@@ -10,6 +10,10 @@ HEIGHT = 7
 
 Frame = list  # list[HEIGHT] of list[WIDTH] of (r, g, b)
 
+# Edge glints: left col for A/B, right col for X/Y; top half A/X, bottom B/Y
+_GLINT = {"A": (0, range(0, 3)), "B": (0, range(4, 7)),
+          "X": (WIDTH - 1, range(0, 3)), "Y": (WIDTH - 1, range(4, 7))}
+
 
 @dataclass
 class Effects:
@@ -58,5 +62,18 @@ def render_frame(state: StateSnapshot, tick: int, effects: Effects = None) -> Fr
             for y in range(5):
                 if col >> y & 1:
                     frame[2 + y][x] = (r, g, b)
+
+    # Edge glints
+    if effects:
+        if tick < effects.glint_until and effects.glint_btn in _GLINT:
+            x, rows = _GLINT[effects.glint_btn]
+            for y in rows:
+                frame[y][x] = (255, 255, 255)
+        if effects.hold_btn in _GLINT and effects.hold_frac > 0:
+            x, rows = _GLINT[effects.hold_btn]
+            rows = list(rows)
+            lit = round(len(rows) * effects.hold_frac)
+            for y in rows[:lit]:
+                frame[y][x] = (255, 255, 255)
 
     return frame
