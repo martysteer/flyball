@@ -16,6 +16,7 @@ class StateSnapshot:
     committed: bool
     mode: str  # "word" | "engine"
     engine: Optional[dict] = None  # {"loop": bool, "speed_s": int, "operator": str, "queue_depth": int}
+    committed_index: Optional[int] = None  # Three-state pip brightness: which index is committed
 
 
 CHANNEL_COLORS = {
