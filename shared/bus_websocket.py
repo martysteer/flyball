@@ -86,14 +86,16 @@ class WebSocketClient(BusClient):
         """Register handler for message type."""
         self.handlers[msg_type] = handler
 
-    async def send(self, msg: Dict[str, Any]) -> None:
-        """Send message to server. Drops message if disconnected."""
+    async def send(self, msg: Dict[str, Any]) -> bool:
+        """Send message to server. Returns False if dropped (disconnected)."""
         if not self.websocket:
-            return
+            return False
         try:
             await self.websocket.send(json.dumps(msg))
+            return True
         except websockets.exceptions.ConnectionClosed:
             logger.warning(f"Send dropped (disconnected): {msg.get('type')}")
+            return False
 
     async def connect(self, host: str, port: int, max_retries: int = 60) -> None:
         """Connect to WebSocket server with retry + exponential backoff."""

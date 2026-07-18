@@ -75,3 +75,14 @@ def test_send_payload_shape():
     assert payload["channels"]["subject"] == s.committed_word["subject"]
     assert payload["channels"]["context"] is None
     assert payload["engine"]["operator"] == "swap"
+
+
+def test_engine_op_setting_cycles_operator():
+    s = make_state()
+    while s.active != "engine":
+        s.next_channel()
+    s.cycle_engine_setting()           # setting: send -> op
+    assert s.snapshot().candidate == "OP SWAP"
+    s.next_option()                    # cycles operator value
+    assert s.snapshot().candidate == "OP LANG"
+    assert s.send_payload()["engine"]["operator"] == "lang"

@@ -153,7 +153,12 @@ class Controller:
         if btn == "A":
             s.jump(-5) if kind == "long" else s.prev_option()
         elif btn == "X":
-            s.jump(5) if kind == "long" else s.next_option()
+            if s.active == "engine":
+                s.cycle_engine_setting()
+            elif kind == "long":
+                s.jump(5)
+            else:
+                s.next_option()
         elif btn == "B":
             if kind == "long":
                 s.uncommit()
@@ -174,8 +179,11 @@ class Controller:
     async def _send(self) -> None:
         """Explicit send → Conductor renders e-ink once."""
         msg = SendMessage(**self.local.send_payload())
-        await self.bus.send(msg.model_dump())
-        logger.info("Sent to Slate")
+        if await self.bus.send(msg.model_dump()):
+            logger.info("Sent to Slate")
+        else:
+            self.effects.flash_until = self.tick + 3
+            self.effects.flash_color = (255, 0, 0)  # red flash when disconnected
 
     def _on_exit_signal(self) -> None:
         """Handle exit signal."""

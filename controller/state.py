@@ -79,7 +79,7 @@ class LocalState:
     def _candidate(self) -> str:
         if self.active == "engine":
             setting = ENGINE_SETTINGS[self.engine_setting]
-            return "SEND" if setting == "send" else f"OP {OPERATORS[self.operator]}"
+            return "SEND" if setting == "send" else f"OP {OPERATORS[self.operator].upper()}"
         return self.options[self.active][self.index[self.active]]
 
     def snapshot(self) -> StateSnapshot:
