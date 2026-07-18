@@ -36,11 +36,15 @@ class Controller:
 
     async def connect(self, host: str, port: int) -> None:
         """Connect to Conductor and start listening."""
+        self.bus.on_connect = self._send_hello  # re-hello on reconnect
         await self.bus.connect(host, port)
         self.running = True
         self.loop = asyncio.get_running_loop()
 
-        # Send hello
+        await self._send_hello()
+
+    async def _send_hello(self) -> None:
+        """Send hello — Conductor responds with full state broadcast."""
         hello = HelloMessage(device="spark", fw="0.1.0")
         await self.bus.send(hello.model_dump())
 

@@ -91,12 +91,19 @@ class Conductor:
         self.display.close()
 
     async def _render_loop(self) -> None:
-        """Background task: consume render queue and update display."""
+        """Background task: consume render queue and update display.
+
+        render_image blocks ~30s on real e-ink, so run it in an executor
+        thread — a sync call inside a coroutine would freeze the whole
+        event loop (handshakes, pings, messages).
+        """
         while self.server_running:
             try:
                 frame = await self.render_queue.get()
                 logger.debug("Rendering queued frame")
-                self.display.render_image(frame)
+                await asyncio.get_running_loop().run_in_executor(
+                    None, self.display.render_image, frame
+                )
                 logger.debug("Render complete")
             except asyncio.CancelledError:
                 break

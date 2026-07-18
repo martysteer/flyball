@@ -82,3 +82,38 @@ async def test_websocket_server_sends_state():
     result = await run_test()
     assert len(result) > 0
     assert result[0]["candidate"] == "Detective"
+
+
+@pytest.mark.asyncio
+async def test_client_reconnects_after_server_restart():
+    """Client auto-reconnects and fires on_connect after server drop."""
+    server = WebSocketServer()
+    client = WebSocketClient()
+
+    reconnects = []
+
+    async def on_connect():
+        reconnects.append(1)
+
+    client.on_connect = on_connect
+
+    await server.start("localhost", 18767)
+    await client.connect("localhost", 18767)
+    await asyncio.sleep(0.1)
+
+    # Kill server — client should notice and start reconnecting
+    await server.disconnect()
+    await asyncio.sleep(0.1)
+
+    # Restart server on same port
+    server2 = WebSocketServer()
+    await server2.start("localhost", 18767)
+
+    # First retry backoff is 1s
+    await asyncio.sleep(2.5)
+
+    assert reconnects, "client should reconnect and fire on_connect"
+    assert client.running
+
+    await client.disconnect()
+    await server2.disconnect()
