@@ -85,7 +85,7 @@ class Controller:
         self.display.close()
 
     async def _ticker_loop(self) -> None:
-        """20fps animation ticker: render current state, reset tick on text change."""
+        """30fps animation ticker: render current state, reset tick on text change."""
         while self.running:
             if self.current_state:
                 # Reset tick when text changes (dwell at start of each new text)
@@ -94,7 +94,7 @@ class Controller:
                     self.last_candidate = self.current_state.candidate
                 self.display.push(render_frame(self.current_state, self.tick))
             self.tick += 1
-            await asyncio.sleep(1 / 20)
+            await asyncio.sleep(1 / 30)
 
     def _on_state(self, msg: dict) -> None:
         """Handle state update from Conductor."""

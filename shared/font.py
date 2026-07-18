@@ -75,10 +75,10 @@ def text_width(text: str) -> int:
     return len(render_columns(text))
 
 
-def bounce_offset(total_cols: int, window: int, tick: int, ticks_per_col: int = 3, dwell_ticks: int = 20) -> int:
+def bounce_offset(total_cols: int, window: int, tick: int, ticks_per_col: int = 2, dwell_ticks: int = 30) -> int:
     """Triangle-wave scroll offset: dwell at start, scroll left/right.
 
-    At 20fps, ticks_per_col=3 → ~6.7 cols/s. Dwell 20 ticks = 1s at 20fps.
+    At 30fps, ticks_per_col=2 → 15 cols/s. Dwell 30 ticks = 1s at 30fps.
     """
     max_off = total_cols - window
     if max_off <= 0:

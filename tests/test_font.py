@@ -71,8 +71,8 @@ def test_render_columns_with_padding():
 
 
 def test_bounce_dwells_at_start():
-    # dwell_ticks=10 → offset stays 0 for first 10 ticks
-    assert bounce_offset(30, 17, tick=0, dwell_ticks=10) == 0
-    assert bounce_offset(30, 17, tick=9, dwell_ticks=10) == 0
-    assert bounce_offset(30, 17, tick=10, dwell_ticks=10) == 0  # step=2, starts moving
-    assert bounce_offset(30, 17, tick=15, dwell_ticks=10) == 1
+    # Default dwell_ticks=30 → offset stays 0 for first 30 ticks
+    assert bounce_offset(30, 17, tick=0) == 0
+    assert bounce_offset(30, 17, tick=29) == 0
+    # At tick=30, dwell ends; step=0, starts moving
+    assert bounce_offset(30, 17, tick=32) == 1  # (32-30)//2 = 1

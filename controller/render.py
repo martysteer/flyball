@@ -28,7 +28,7 @@ def render_frame(state: StateSnapshot, tick: int) -> Frame:
         frame[1][i] = (r, g, b) if i == state.option_index else (r // 8, g // 8, b // 8)
 
     # Rows 2-6: candidate text with bounce scroll + padding
-    cols = render_columns(state.candidate, padding=5)
+    cols = render_columns(state.candidate, padding=2)
     off = bounce_offset(len(cols), WIDTH, tick)
     for x in range(WIDTH):
         i = x + off
