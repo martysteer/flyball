@@ -1291,14 +1291,14 @@ Replace `_on_button_event` and add gesture dispatch:
                 self._on_gesture(btn, "short")
 
     def _on_gesture(self, btn: str, kind: str) -> None:
-        """Dispatch button grammar (spec §2)."""
+        """Dispatch button grammar (spec §2, revised for spatial mapping)."""
         print(f"[Spark] {btn} {kind}", flush=True)
         s = self.local
         if btn == "A":
             s.prev_option()          # long: jump -5 (S5)
-        elif btn == "B":
-            s.next_option()          # long: jump +5 (S5)
         elif btn == "X":
+            s.next_option()          # long: jump +5 (S5)
+        elif btn == "B":
             s.commit()               # long: uncommit (S5)
         elif btn == "Y":
             if kind == "long" and s.active == "engine":
@@ -1453,7 +1453,7 @@ git commit -m "feat: effects overlay, commit flash, uncommit (S5)"
 ```python
         if btn == "A":
             s.jump(-5) if kind == "long" else s.prev_option()
-        elif btn == "B":
+        elif btn == "X":
             s.jump(5) if kind == "long" else s.next_option()
         ...
         elif btn == "Y":

@@ -28,18 +28,19 @@ explicit and slow.
 - **New message**: `send {channels: {subject, context, style}, engine: {...}}`.
 - **Slate buttons**: unwired (listener code stays, slate keymap ignored).
 
-## 2. Button Grammar (Option A)
+## 2. Button Grammar (Revised for Spatial Mapping)
 
 | Btn | Short | Long (≥600ms) |
 |---|---|---|
 | A (top-left) | prev option | jump −5 |
-| B (bottom-left) | next option | jump +5 |
-| X (top-right) | commit channel | uncommit (clear channel) |
+| X (top-right) | next option | jump +5 |
+| B (bottom-left) | commit channel | uncommit (clear channel) |
 | Y (bottom-right) | next channel (Subj→Ctx→Style→Engine→wrap) | Engine: **send** / else: randomize channel |
 
 - Long-press **fires at 600ms while held** (not on release) — snappier feel.
   `# ponytail: threshold constant, tune on hardware`
-- Left thumb explores, right thumb acts (preserves docs/02 hand grammar).
+- **Top buttons (A/X) navigate pips** — spatial mapping to row-1 pip display.
+- **Bottom buttons (B/Y) commit + channel** — actions vs exploration.
 
 ## 3. Spark Display (17×7)
 
