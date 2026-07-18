@@ -18,6 +18,14 @@ class StateSnapshot:
     engine: Optional[dict] = None  # {"loop": bool, "speed_s": int, "operator": str, "queue_depth": int}
 
 
+CHANNEL_COLORS = {
+    "subject": (0, 200, 80),    # green
+    "context": (0, 100, 200),   # blue
+    "style": (200, 0, 150),     # magenta
+    "engine": (200, 150, 0),    # amber
+}
+
+
 class Display(ABC):
     """Abstract display."""
 

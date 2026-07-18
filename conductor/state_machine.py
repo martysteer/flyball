@@ -5,13 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 
-
-CHANNEL_COLORS = {
-    "subject": (0, 200, 80),    # green
-    "context": (0, 100, 200),   # blue
-    "style": (200, 0, 150),     # magenta
-    "engine": (200, 150, 0),    # amber
-}
+from shared.interfaces.display import CHANNEL_COLORS
 
 
 @dataclass
