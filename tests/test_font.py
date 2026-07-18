@@ -1,6 +1,6 @@
 """Tests for shared/font.py — variable-width column font."""
 
-from shared.font import FONT, render_columns, text_width
+from shared.font import FONT, render_columns, text_width, bounce_offset
 
 
 def test_i_is_single_full_column():
@@ -40,3 +40,23 @@ def test_all_glyphs_are_5_rows_max():
     for ch, cols in FONT.items():
         for col in cols:
             assert 0 <= col < 32, f"{ch} column exceeds 5 bits"
+
+
+def test_bounce_static_when_text_fits():
+    assert bounce_offset(17, 17, tick=0) == 0
+    assert bounce_offset(10, 17, tick=999) == 0
+
+
+def test_bounce_scrolls_to_max_then_back():
+    # 20 cols in 17 window → max offset 3; ticks_per_col=5
+    assert bounce_offset(20, 17, tick=0) == 0
+    assert bounce_offset(20, 17, tick=5) == 1
+    assert bounce_offset(20, 17, tick=15) == 3   # end visible
+    assert bounce_offset(20, 17, tick=20) == 2   # reversing
+    assert bounce_offset(20, 17, tick=30) == 0   # back at start
+
+
+def test_bounce_never_exceeds_bounds():
+    for tick in range(200):
+        off = bounce_offset(40, 17, tick)
+        assert 0 <= off <= 23

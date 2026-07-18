@@ -71,3 +71,17 @@ def render_columns(text: str) -> list:
 def text_width(text: str) -> int:
     """Total column count for text (including inter-char gaps)."""
     return len(render_columns(text))
+
+
+def bounce_offset(total_cols: int, window: int, tick: int, ticks_per_col: int = 5) -> int:
+    """Triangle-wave scroll offset: left until end visible, then reverse.
+
+    At 15fps, ticks_per_col=5 → 3 cols/s (medium speed per spec).
+    """
+    max_off = total_cols - window
+    if max_off <= 0:
+        return 0
+    step = tick // ticks_per_col
+    period = 2 * max_off
+    pos = step % period
+    return pos if pos <= max_off else period - pos
