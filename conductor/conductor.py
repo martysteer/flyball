@@ -33,6 +33,7 @@ class Conductor:
         # Register message handlers
         self.bus.on("hello", self._on_hello)
         self.bus.on("button", self._on_button)
+        self.bus.on("send", self._on_send)
         self.bus.on("ping", self._on_ping)
 
     async def start(self, host: str, port: int) -> None:
@@ -109,6 +110,23 @@ class Conductor:
     def _on_button(self, msg: dict) -> None:
         """Legacy button events — ignored (Spark owns exploration now)."""
         logger.debug(f"Ignoring button message: {msg}")
+
+    def _on_send(self, msg: dict) -> None:
+        """Explicit send: adopt committed words, queue one e-ink render."""
+        for ch_id, word in msg.get("channels", {}).items():
+            ch = self.registry.channels.get(ch_id)
+            if ch is None or ch_id == "engine":
+                continue
+            if word and word in ch.options:
+                ch.option_index = ch.options.index(word)
+                ch.committed = True
+            else:
+                ch.committed = False  # None or unknown word → cleared
+        op = msg.get("engine", {}).get("operator")
+        if op:
+            self.registry.channels["engine"].operator = op
+        logger.info(f"Send: {self.registry.render_sentence()}")
+        self._render_current()
 
     def _on_ping(self, msg: dict) -> None:
         """Handle ping from Controller."""

@@ -62,6 +62,13 @@ class PatchMessage(BaseMessage):
     committed: Optional[bool] = None
 
 
+class SendMessage(BaseMessage):
+    """Explicit send from Controller: committed words + engine settings."""
+    type: str = Field(default="send", frozen=True)
+    channels: Dict[str, Optional[str]]  # subject/context/style -> word or None
+    engine: Dict[str, Any] = Field(default_factory=dict)
+
+
 # Helper: create message from dict
 def message_from_dict(data: Dict[str, Any]) -> BaseMessage:
     """Deserialize message dict to appropriate type."""
@@ -80,5 +87,7 @@ def message_from_dict(data: Dict[str, Any]) -> BaseMessage:
         return ToastMessage(**data)
     elif msg_type == "patch":
         return PatchMessage(**data)
+    elif msg_type == "send":
+        return SendMessage(**data)
     else:
         raise ValueError(f"Unknown message type: {msg_type}")
