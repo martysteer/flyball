@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -12,6 +13,7 @@ from shared.bus_websocket import WebSocketServer
 from shared.messages import ButtonMessage, StateMessage, PongMessage
 from shared.keymap import Keymap, normalize_action
 from shared.basic_image_backend import BasicImageBackend
+from shared.config import IS_SIMULATION
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ class Conductor:
         self.loop = None
         self.buttons: Optional[GPIOButtonListener] = None
         self.server_running = True
+        self.last_display_update = 0.0  # Timestamp of last e-ink update
 
         # Load keymaps
         self.spark_keymap = Keymap.load(KEYMAPS_DIR / "spark.json")
@@ -155,4 +158,10 @@ class Conductor:
 
         # Render to Slate display via BasicImageBackend
         frame = self.image_backend.render_frame(snapshot)
-        self.display.render_image(frame)
+
+        # Debounce e-ink updates on hardware (30s refresh blocks buttons)
+        # Only update if: simulation OR 35s+ since last update
+        now = time.time()
+        if IS_SIMULATION or (now - self.last_display_update) >= 35:
+            self.display.render_image(frame)
+            self.last_display_update = now

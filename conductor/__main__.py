@@ -26,15 +26,23 @@ async def main():
 
     try:
         logger.info("Starting Conductor server...")
-        await conductor.start("localhost", 8765)
+        # Bind to 0.0.0.0 on hardware so Spark can connect over network
+        bind_host = "localhost" if IS_SIMULATION else "0.0.0.0"
+        await conductor.start(bind_host, 8765)
 
         # Keep running and process events
-        while conductor.server_running:
-            # Re-render to process pygame events (keyboard, window close)
-            snapshot = StateSnapshot.from_registry(conductor.registry, mode="word")
-            frame = conductor.image_backend.render_frame(snapshot)
-            conductor.display.render_image(frame)
-            await asyncio.sleep(0.05)  # ~20 FPS event processing
+        if IS_SIMULATION:
+            # Simulation: constantly re-render to process pygame keyboard events
+            while conductor.server_running:
+                snapshot = StateSnapshot.from_registry(conductor.registry, mode="word")
+                frame = conductor.image_backend.render_frame(snapshot)
+                conductor.display.render_image(frame)
+                await asyncio.sleep(0.05)  # ~20 FPS
+        else:
+            # Hardware: just wait for GPIO button events (no constant re-render needed)
+            # Display updates happen in _broadcast_state() when state changes
+            while conductor.server_running:
+                await asyncio.sleep(1)
 
     except KeyboardInterrupt:
         logger.info("Shutting down...")

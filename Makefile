@@ -42,6 +42,7 @@ setup-inky:
 
 # One-time Spark Pi setup — Unicorn HAT Mini drivers
 # Run on flyball-spark Pi only. Handles: SPI, I2C, config.txt, GPIO, Python drivers.
+# Detects Trixie/Bookworm and uses install-trixie.sh; older releases use stock installer.
 setup-unicorn:
 	@if [ "$$(uname -s)" != "Linux" ]; then \
 		echo "setup-unicorn is for Raspberry Pi only. Skipping on $$(uname -s)."; \
@@ -54,15 +55,28 @@ setup-unicorn:
 	@echo ""
 	@rm -rf /tmp/pimoroni-unicorn
 	git clone --depth 1 https://github.com/pimoroni/unicornhatmini-python /tmp/pimoroni-unicorn
-	cd /tmp/pimoroni-unicorn && sudo ./install.sh
+	@if [ -f /etc/os-release ]; then \
+		. /etc/os-release; \
+		case "$${VERSION_CODENAME:-unknown}" in \
+			trixie|bookworm) \
+				echo "Detected $${VERSION_CODENAME} — using Trixie-compatible installer"; \
+				cp deploy/unicornhatmini-trixie/install-trixie.sh /tmp/pimoroni-unicorn/; \
+				chmod +x /tmp/pimoroni-unicorn/install-trixie.sh; \
+				cd /tmp/pimoroni-unicorn && ./install-trixie.sh; \
+				;; \
+			*) \
+				echo "Using stock installer"; \
+				cd /tmp/pimoroni-unicorn && sudo ./install.sh; \
+				;; \
+		esac; \
+	else \
+		echo "Cannot detect OS release — using stock installer"; \
+		cd /tmp/pimoroni-unicorn && sudo ./install.sh; \
+	fi
 	@echo ""
 	@echo "✓ Unicorn HAT Mini drivers installed."
 	@echo "  REBOOT REQUIRED: sudo reboot"
 	@echo "  Then run: make setup"
-	@echo ""
-	@echo "⚠️  If you also ran 'make setup-inky' on this Pi, you may need to fix SPI config:"
-	@echo "    Edit /boot/firmware/config.txt and remove 'dtoverlay=spi0-0cs' if present."
-	@echo "    Both HATs need 'dtparam=spi=on' (gives CS0 + CS1). Reboot after editing."
 
 venv:
 	@if [ ! -d "$(VENV)" ]; then \

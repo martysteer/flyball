@@ -20,6 +20,8 @@ make setup-inky
 
 # On flyball-spark (Unicorn HAT Mini):
 make setup-unicorn
+# Detects Trixie/Bookworm and uses venv-based installer automatically
+# Older releases use stock installer
 
 # When prompted to install examples, press Y — lets you test hardware separately from Flyball
 # Examples install to ~/Pimoroni/inky or ~/Pimoroni/unicornhatmini
@@ -84,11 +86,13 @@ export FLYBALL_CONDUCTOR_HOST=<slate-ip>     # override on Spark
 
 **Inky not refreshing:** normal refresh takes ~30-40s. Check logs for render messages.
 
+**Trixie/Bookworm (Debian 12+):** On Trixie, Unicorn HAT Mini install uses `~/.virtualenvs/pimoroni` venv and `dtoverlay=spi0-2cs` instead of `dtparam=spi=on`. See `deploy/unicornhatmini-trixie/GETTING-STARTED-TRIXIE.md` for details. The Makefile detects this automatically.
+
 **Both HATs on same Pi (testing/dev):** If you ran both `make setup-inky` and `make setup-unicorn` on the same Pi, check SPI config:
 ```bash
 grep spi /boot/firmware/config.txt
-# Should have: dtparam=spi=on
-# Remove if present: dtoverlay=spi0-0cs (blocks Unicorn HAT Mini)
+# Bullseye and earlier: dtparam=spi=on
+# Trixie/Bookworm: dtoverlay=spi0-2cs,cs0_pin=27,cs1_pin=22
 # Need both /dev/spidev0.0 (Inky) and /dev/spidev0.1 (Unicorn)
 sudo reboot  # after editing config.txt
 ```
