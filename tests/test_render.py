@@ -62,3 +62,17 @@ def test_engine_mode_shows_candidate_text():
     frame = render_frame(state, tick=0)
     # padding=2, 'S' first col at frame col 2; 'S' col 0: bit1,bit4 set → rows 3,4
     assert frame[3][2] == (200, 150, 0)
+
+
+def test_three_state_pip_brightness():
+    # Committed at index 2, cursor at index 4 → three brightness levels
+    state = make_state(option_index=4, option_count=7, committed_index=2)
+    frame = render_frame(state, tick=0)
+    # Brightest at cursor (index 4)
+    assert frame[1][4] == (0, 200, 80)
+    # Bright at committed (index 2)
+    assert frame[1][2] == (0, 200 // 2, 80 // 2)
+    # Dim elsewhere (index 0, 1, 3, 5, 6)
+    assert frame[1][0] == (0, 200 // 8, 80 // 8)
+    assert frame[1][1] == (0, 200 // 8, 80 // 8)
+    assert frame[1][3] == (0, 200 // 8, 80 // 8)

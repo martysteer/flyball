@@ -23,9 +23,14 @@ def render_frame(state: StateSnapshot, tick: int) -> Frame:
     for x in range(WIDTH):
         frame[0][x] = bar
 
-    # Row 1: option pips, bright at current index
+    # Row 1: option pips — three-state brightness
     for i in range(min(state.option_count, WIDTH)):
-        frame[1][i] = (r, g, b) if i == state.option_index else (r // 8, g // 8, b // 8)
+        if i == state.option_index:
+            frame[1][i] = (r, g, b)  # brightest: current cursor
+        elif state.committed_index is not None and i == state.committed_index:
+            frame[1][i] = (r // 2, g // 2, b // 2)  # bright: committed index
+        else:
+            frame[1][i] = (r // 8, g // 8, b // 8)  # dim: others
 
     # Rows 2-6: candidate text with bounce scroll + padding
     cols = render_columns(state.candidate, padding=2)
