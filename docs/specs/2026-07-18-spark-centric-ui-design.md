@@ -47,7 +47,7 @@ explicit and slow.
 | Rows | Content |
 |---|---|
 | 0 | Channel color bar. Solid = channel committed, dim = uncommitted. |
-| 1 | Option pips, bright = current index. Engine: setting pips. |
+| 1 | Option pips: **brightest** = current index, **bright** = committed (if different from current), **dim** = others. Committed pip stays visible when navigating away. Engine: setting pips. |
 | 2–6 | Candidate word, variable-width 5-high font, bounce scroll, channel color. |
 
 - **Bounce scroll**: medium speed (~3 cols/s), scrolls left until end
@@ -119,3 +119,5 @@ Each stage: green tests + sim demo before the next.
 - Local-state inversion scoped to exploration only — Conductor keeps
   authority for sentence-of-record, queue, image gen (CLAUDE.md rule 1
   honored at the commitment boundary, not the exploration loop).
+- **Button grammar revised for spatial mapping** — A/X top buttons navigate pips (matches row-1 layout), B/Y bottom buttons commit/channel (2026-07-18).
+- **Three-state pip brightness** — brightest = current cursor, bright = committed (when cursor elsewhere), dim = others. Visual feedback shows locked-in choice while exploring (2026-07-18).
