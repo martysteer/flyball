@@ -2,14 +2,16 @@
 
 import asyncio
 import logging
+import time
 from typing import Optional
 
 from controller.display import SparkDisplay, HAS_UNICORN
 from controller.buttons import GPIOButtonListener, HAS_GPIO
 from controller.render import render_frame
 from controller.state import LocalState
+from controller.longpress import LongPressDetector
 from shared.bus_websocket import WebSocketClient
-from shared.messages import HelloMessage, PingMessage
+from shared.messages import HelloMessage, PingMessage, SendMessage
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,7 @@ class Controller:
         self.buttons: Optional[GPIOButtonListener] = None
         self.running = False
         self.local = LocalState()
+        self.detector = LongPressDetector()
         self.loop = None
         self.heartbeat_task = None
         self.tick = 0
@@ -83,8 +86,11 @@ class Controller:
         self.display.close()
 
     async def _ticker_loop(self) -> None:
-        """30fps animation ticker: render local state, reset tick on text change."""
+        """30fps animation ticker: long-press poll + render."""
         while self.running:
+            # Poll long-press detector
+            for btn in self.detector.poll(time.monotonic()):
+                self._on_gesture(btn, "long")
             snap = self.local.snapshot()
             # Reset tick when text changes (dwell at start of each new text)
             if snap.candidate != self.last_candidate:
@@ -124,19 +130,36 @@ class Controller:
             asyncio.run_coroutine_threadsafe(coro, self.loop)
 
     def _on_button_event(self, btn: str, event: str) -> None:
-        """Local state update per press. No network traffic while exploring."""
-        if event != "press":
-            return
-        print(f"[Spark] {btn} {event}", flush=True)
-        # Spatial mapping: A/X top = navigate pips, B/Y bottom = commit/channel
+        """Feed press/release into long-press detector."""
+        now = time.monotonic()
+        if event == "press":
+            self.detector.press(btn, now)
+        elif event == "release":
+            if self.detector.release(btn, now) == "short":
+                self._on_gesture(btn, "short")
+
+    def _on_gesture(self, btn: str, kind: str) -> None:
+        """Dispatch button grammar (spec §2, spatial mapping)."""
+        print(f"[Spark] {btn} {kind}", flush=True)
+        s = self.local
         if btn == "A":
-            self.local.prev_option()
+            s.prev_option()          # long: jump -5 (S5)
         elif btn == "X":
-            self.local.next_option()
+            s.next_option()          # long: jump +5 (S5)
         elif btn == "B":
-            self.local.commit()
+            s.commit()               # long: uncommit (S5)
         elif btn == "Y":
-            self.local.next_channel()
+            if kind == "long" and s.active == "engine":
+                self._schedule(self._send())
+            elif kind == "short":
+                s.next_channel()
+            # long on non-engine: randomize (S5)
+
+    async def _send(self) -> None:
+        """Explicit send → Conductor renders e-ink once."""
+        msg = SendMessage(**self.local.send_payload())
+        await self.bus.send(msg.model_dump())
+        logger.info("Sent to Slate")
 
     def _on_exit_signal(self) -> None:
         """Handle exit signal."""

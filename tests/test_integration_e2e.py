@@ -13,6 +13,12 @@ def word_blocks_path():
     return Path(__file__).parent.parent / "shared" / "data" / "word_blocks.json"
 
 
+def short_press(controller, btn):
+    """Simulate a short press (press + release)."""
+    controller._on_button_event(btn, "press")
+    controller._on_button_event(btn, "release")
+
+
 @pytest.mark.asyncio
 async def test_full_two_handed_flow(word_blocks_path):
     """End-to-end: Conductor + Controller + local exploration state."""
@@ -37,16 +43,16 @@ async def test_full_two_handed_flow(word_blocks_path):
     assert snap.channel == "subject"
     assert snap.committed is False
 
-    # Local button press: next option (no network traffic)
-    controller._on_button_event("X", "press")
+    # Short press: next option (no network traffic)
+    short_press(controller, "X")
     assert controller.local.index["subject"] == 1
 
-    # Local button press: commit
-    controller._on_button_event("B", "press")
+    # Short press: commit
+    short_press(controller, "B")
     assert controller.local.snapshot().committed is True
 
     # Channel cycle
-    controller._on_button_event("Y", "press")
+    short_press(controller, "Y")
     assert controller.local.active == "context"
 
     # Clean up
