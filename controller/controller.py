@@ -102,13 +102,13 @@ class Controller:
         """Handle toast message."""
         logger.info(f"Toast: {msg.get('text')}")
 
-    def _on_key(self, char: str) -> None:
-        """Handle key press from pygame display."""
+    def _on_key(self, char: str, event: str = "press") -> None:
+        """Handle key event from pygame display."""
         key_map = {'a': 'A', 'b': 'B', 'x': 'X', 'y': 'Y'}
         if char == 'q':
             self._on_exit_signal()
         elif char in key_map:
-            self._on_button_event(key_map[char], "press")
+            self._on_button_event(key_map[char], event)
 
     def _schedule(self, coro) -> None:
         """Schedule a coroutine from either the event loop or a thread."""

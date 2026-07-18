@@ -21,8 +21,9 @@ class SparkMock:
         from controller.unicorn_mock import UnicornHATMiniBase
         self.unicorn = UnicornHATMiniBase()
         self.unicorn.set_brightness(get_spark_brightness())
-        self.on_key = None  # Callback: (char: str) -> None
+        self.on_key = None  # Callback: (char: str, event: str) -> None
         self.unicorn.on_button_pressed(self._on_button_pin)
+        self.unicorn.on_button_released(self._on_button_release)
 
     def poll_events(self) -> None:
         """Process pygame events (keyboard + window close)."""
@@ -45,14 +46,20 @@ class SparkMock:
 
     def _on_button_pin(self, pin) -> None:
         """Handle button press from unicorn mock."""
+        self._emit(pin, "press")
+
+    def _on_button_release(self, pin) -> None:
+        self._emit(pin, "release")
+
+    def _emit(self, pin, event: str) -> None:
         if pin == 'q':
             if self.on_key:
-                self.on_key('q')
+                self.on_key('q', "press")
             return
         pin_map = {5: 'a', 6: 'b', 16: 'x', 24: 'y'}
         char = pin_map.get(pin)
         if char and self.on_key:
-            self.on_key(char)
+            self.on_key(char, event)
 
     def close(self) -> None:
         """Clean up display."""

@@ -36,6 +36,7 @@ class UnicornHATMiniBase:
             self.BUTTON_Y: False
         }
         self.button_callback = None
+        self.button_release_callback = None
         
         # Scale factor for larger display (makes it easier to see)
         self.scale = 15
@@ -133,6 +134,10 @@ class UnicornHATMiniBase:
     def on_button_pressed(self, callback):
         """Register callback for button events."""
         self.button_callback = callback
+
+    def on_button_released(self, callback):
+        """Register callback for button release events."""
+        self.button_release_callback = callback
     
     def read_button(self, pin):
         """Read the current state of a button."""
@@ -230,8 +235,9 @@ class UnicornHATMiniBase:
             elif event.type == pygame.KEYUP:
                 if event.key in key_map:
                     button = key_map[event.key]
-                    # Update button state
                     self.button_states[button] = False
+                    if self.button_release_callback:
+                        self.button_release_callback(button)
 
 
 # Simple test if run directly

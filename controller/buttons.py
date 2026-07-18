@@ -129,7 +129,8 @@ class GPIOButtonListener(ButtonListener):
             try:
                 for name, pin in pins.items():
                     btn = Button(pin, pull_up=True, bounce_time=0.1)
-                    btn.when_pressed = lambda n=name: self._on_press(n)
+                    btn.when_pressed = lambda n=name: self._on_event(n, "press")
+                    btn.when_released = lambda n=name: self._on_event(n, "release")
                     self.gpio_buttons[name] = btn
             except (OSError, RuntimeError, ImportError) as e:
                 if not IS_SIMULATION:
@@ -144,10 +145,10 @@ class GPIOButtonListener(ButtonListener):
                 raise ImportError("gpiozero not available on Pi hardware")
             self.fallback = KeyboardListener(device=device, on_exit=on_exit)
 
-    def _on_press(self, btn_name: str) -> None:
-        """Handle GPIO button press."""
+    def _on_event(self, btn_name: str, event: str) -> None:
+        """Handle GPIO button edge (press or release)."""
         if self.handler:
-            self.handler(btn_name, "press")
+            self.handler(btn_name, event)
 
     def on(self, handler: Callable[[str, str], None]) -> None:
         """Register handler."""
