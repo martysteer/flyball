@@ -7,7 +7,7 @@ from typing import Optional
 
 from controller.display import SparkDisplay, HAS_UNICORN
 from controller.buttons import GPIOButtonListener, HAS_GPIO
-from controller.render import render_frame
+from controller.render import render_frame, Effects
 from controller.state import LocalState
 from controller.longpress import LongPressDetector
 from shared.bus_websocket import WebSocketClient
@@ -27,6 +27,7 @@ class Controller:
         self.running = False
         self.local = LocalState()
         self.detector = LongPressDetector()
+        self.effects = Effects()
         self.loop = None
         self.heartbeat_task = None
         self.tick = 0
@@ -96,7 +97,7 @@ class Controller:
             if snap.candidate != self.last_candidate:
                 self.tick = 0
                 self.last_candidate = snap.candidate
-            self.display.push(render_frame(snap, self.tick))
+            self.display.push(render_frame(snap, self.tick, self.effects))
             self.tick += 1
             await asyncio.sleep(1 / 30)
 
@@ -147,7 +148,13 @@ class Controller:
         elif btn == "X":
             s.next_option()          # long: jump +5 (S5)
         elif btn == "B":
-            s.commit()               # long: uncommit (S5)
+            if kind == "long":
+                s.uncommit()
+            else:
+                s.commit()
+                snap = s.snapshot()
+                self.effects.flash_until = self.tick + 2
+                self.effects.flash_color = snap.channel_color
         elif btn == "Y":
             if kind == "long" and s.active == "engine":
                 self._schedule(self._send())

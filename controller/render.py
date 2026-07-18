@@ -1,5 +1,7 @@
 """Pure Spark frame renderer: (state, tick) → 7×17 RGB grid."""
 
+from dataclasses import dataclass
+
 from shared.font import render_columns, bounce_offset
 from shared.interfaces.display import StateSnapshot
 
@@ -9,12 +11,26 @@ HEIGHT = 7
 Frame = list  # list[HEIGHT] of list[WIDTH] of (r, g, b)
 
 
+@dataclass
+class Effects:
+    """Transient overlay state owned by the ticker."""
+    flash_until: int = 0                      # tick before which full-matrix flash shows
+    flash_color: tuple = (255, 255, 255)
+    glint_until: int = 0                      # tick before which press glint shows
+    glint_btn: str = ""                       # "A" | "B" | "X" | "Y"
+    hold_btn: str = ""                        # button currently held
+    hold_frac: float = 0.0                    # 0..1 growing glint
+
+
 def blank_frame() -> Frame:
     return [[(0, 0, 0) for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
 
-def render_frame(state: StateSnapshot, tick: int) -> Frame:
+def render_frame(state: StateSnapshot, tick: int, effects: Effects = None) -> Frame:
     """Pure render. No I/O, no side effects."""
+    if effects and tick < effects.flash_until:
+        return [[effects.flash_color for _ in range(WIDTH)] for _ in range(HEIGHT)]
+
     frame = blank_frame()
     r, g, b = state.channel_color
 

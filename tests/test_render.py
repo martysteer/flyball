@@ -1,6 +1,6 @@
 """Tests for controller/render.py — pure (state, tick) → frame."""
 
-from controller.render import render_frame, WIDTH, HEIGHT
+from controller.render import render_frame, Effects, WIDTH, HEIGHT
 from shared.interfaces.display import StateSnapshot
 
 
@@ -76,3 +76,16 @@ def test_three_state_pip_brightness():
     assert frame[1][0] == (0, 200 // 8, 80 // 8)
     assert frame[1][1] == (0, 200 // 8, 80 // 8)
     assert frame[1][3] == (0, 200 // 8, 80 // 8)
+
+
+def test_commit_flash_fills_matrix():
+    e = Effects(flash_until=2, flash_color=(0, 200, 80))
+    frame = render_frame(make_state(), tick=0, effects=e)
+    assert frame[3][8] == (0, 200, 80)
+    assert frame[0][0] == (0, 200, 80)
+
+
+def test_flash_expires():
+    e = Effects(flash_until=2, flash_color=(0, 200, 80))
+    frame = render_frame(make_state(candidate="HI"), tick=2, effects=e)
+    assert frame[2][3] == (0, 0, 0)  # normal render resumed
