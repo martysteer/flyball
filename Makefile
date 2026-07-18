@@ -93,7 +93,6 @@ setup: venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 	@echo "✓ Setup complete. Run 'make conductor' or 'make controller'"
-	@echo "  (Hardware lib build failures on Mac are expected — hardware detection handles fallback)"
 
 setup-dev: venv
 	@echo "Installing dev dependencies..."
