@@ -7,9 +7,9 @@ from typing import Optional
 from controller.display import SparkDisplay, HAS_UNICORN
 from controller.buttons import GPIOButtonListener, HAS_GPIO
 from controller.render import render_frame
+from controller.state import LocalState
 from shared.bus_websocket import WebSocketClient
-from shared.messages import HelloMessage, StateMessage, PingMessage, ButtonMessage
-from shared.interfaces.display import StateSnapshot
+from shared.messages import HelloMessage, PingMessage
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class Controller:
         self.display = SparkDisplay()
         self.buttons: Optional[GPIOButtonListener] = None
         self.running = False
-        self.current_state: Optional[StateSnapshot] = None
+        self.local = LocalState()
         self.loop = None
         self.heartbeat_task = None
         self.tick = 0
@@ -31,8 +31,6 @@ class Controller:
         self.ticker_task: Optional[asyncio.Task] = None
 
         # Register bus handlers
-        self.bus.on("state", self._on_state)
-        self.bus.on("patch", self._on_patch)
         self.bus.on("pong", self._on_pong)
         self.bus.on("toast", self._on_toast)
 
@@ -46,7 +44,7 @@ class Controller:
         await self._send_hello()
 
     async def _send_hello(self) -> None:
-        """Send hello — Conductor responds with full state broadcast."""
+        """Send hello — Conductor logs connection."""
         hello = HelloMessage(device="spark", fw="0.1.0")
         await self.bus.send(hello.model_dump())
 
@@ -85,41 +83,16 @@ class Controller:
         self.display.close()
 
     async def _ticker_loop(self) -> None:
-        """30fps animation ticker: render current state, reset tick on text change."""
+        """30fps animation ticker: render local state, reset tick on text change."""
         while self.running:
-            if self.current_state:
-                # Reset tick when text changes (dwell at start of each new text)
-                if self.current_state.candidate != self.last_candidate:
-                    self.tick = 0
-                    self.last_candidate = self.current_state.candidate
-                self.display.push(render_frame(self.current_state, self.tick))
+            snap = self.local.snapshot()
+            # Reset tick when text changes (dwell at start of each new text)
+            if snap.candidate != self.last_candidate:
+                self.tick = 0
+                self.last_candidate = snap.candidate
+            self.display.push(render_frame(snap, self.tick))
             self.tick += 1
             await asyncio.sleep(1 / 30)
-
-    def _on_state(self, msg: dict) -> None:
-        """Handle state update from Conductor."""
-        state = StateSnapshot(
-            channel=msg["channel"],
-            channel_color=tuple(msg["channel_color"]),
-            option_index=msg["option_index"],
-            option_count=msg["option_count"],
-            candidate=msg["candidate"],
-            committed=msg["committed"],
-            mode=msg["mode"],
-            engine=msg.get("engine"),
-        )
-        self.current_state = state
-
-    def _on_patch(self, msg: dict) -> None:
-        """Handle incremental state update."""
-        if not self.current_state:
-            return
-        if "candidate" in msg:
-            self.current_state.candidate = msg["candidate"]
-        if "option_index" in msg:
-            self.current_state.option_index = msg["option_index"]
-        if "committed" in msg:
-            self.current_state.committed = msg["committed"]
 
     def _on_pong(self, msg: dict) -> None:
         """Handle pong from Conductor."""
@@ -151,10 +124,19 @@ class Controller:
             asyncio.run_coroutine_threadsafe(coro, self.loop)
 
     def _on_button_event(self, btn: str, event: str) -> None:
-        """Handle button press."""
+        """Local state update per press. No network traffic while exploring."""
+        if event != "press":
+            return
         print(f"[Spark] {btn} {event}", flush=True)
-        button_msg = ButtonMessage(btn=btn, event=event)
-        self._schedule(self.bus.send(button_msg.model_dump()))
+        # Spatial mapping: A/X top = navigate pips, B/Y bottom = commit/channel
+        if btn == "A":
+            self.local.prev_option()
+        elif btn == "X":
+            self.local.next_option()
+        elif btn == "B":
+            self.local.commit()
+        elif btn == "Y":
+            self.local.next_channel()
 
     def _on_exit_signal(self) -> None:
         """Handle exit signal."""
