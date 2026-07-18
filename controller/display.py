@@ -176,6 +176,7 @@ class SparkDisplay(Display):
             return
 
         # Real hardware: same rendering as SparkMock but on real HAT
+        self.hat.clear()
         r, g, b = state.channel_color
 
         # Row 0: color bar
