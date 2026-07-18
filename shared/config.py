@@ -25,3 +25,9 @@ def get_config_path() -> Optional[Path]:
 def get_word_blocks_path() -> Path:
     """Path to word_blocks.json data file."""
     return Path(__file__).parent / "data" / "word_blocks.json"
+
+
+def get_spark_brightness() -> float:
+    """Unicorn HAT brightness 0.0–1.0. Default dim per spec."""
+    # ponytail: env-only knob, calibrate on hardware
+    return float(os.getenv("FLYBALL_SPARK_BRIGHTNESS", "0.2"))

@@ -1,6 +1,7 @@
 """Spark display: real Unicorn HAT Mini + pygame mock."""
 
-from shared.config import IS_SIMULATION
+from shared.config import IS_SIMULATION, get_spark_brightness
+from shared.font import render_columns
 from shared.interfaces.display import Display, StateSnapshot
 
 # Hardware detection
@@ -9,6 +10,18 @@ try:
     HAS_UNICORN = True
 except ImportError:
     HAS_UNICORN = False
+
+
+def draw_text(set_pixel, text: str, r: int, g: int, b: int, offset: int = 0, width: int = 17) -> None:
+    """Draw text columns onto rows 2-6 via a set_pixel(x, y, r, g, b) callable."""
+    cols = render_columns(text)
+    for x in range(width):
+        i = x + offset
+        if 0 <= i < len(cols):
+            col = cols[i]
+            for y in range(5):
+                if col >> y & 1:
+                    set_pixel(x, 2 + y, r, g, b)
 
 
 class SparkMock(Display):
@@ -21,7 +34,7 @@ class SparkMock(Display):
         import pygame
         from controller.unicorn_mock import UnicornHATMiniBase
         self.unicorn = UnicornHATMiniBase()
-        self.unicorn.set_brightness(0.5)
+        self.unicorn.set_brightness(get_spark_brightness())
         self.on_key = None  # Callback: (char: str) -> None
         self.unicorn.on_button_pressed(self._on_button_pin)
 
@@ -54,57 +67,11 @@ class SparkMock(Display):
             text = state.candidate
             if state.mode == "engine" and state.engine:
                 text = f"[{state.engine['operator'].upper()}]"
-            self._render_text(text, r, g, b)
+            draw_text(self.unicorn.set_pixel, text, r, g, b)
 
             self.unicorn.show()
         except Exception:
             return
-
-    def _render_text(self, text: str, r: int, g: int, b: int) -> None:
-        """Render scrolling text on rows 2-6 using 3x5 font."""
-        font_3x5 = {
-            'A': [[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
-            'B': [[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,1,0]],
-            'C': [[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],
-            'D': [[1,1,0],[1,0,1],[1,0,1],[1,0,1],[1,1,0]],
-            'E': [[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,1,1]],
-            'F': [[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,0,0]],
-            'G': [[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],
-            'H': [[1,0,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
-            'I': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],
-            'J': [[0,0,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
-            'K': [[1,0,1],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
-            'L': [[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],
-            'M': [[1,0,1],[1,1,1],[1,0,1],[1,0,1],[1,0,1]],
-            'N': [[1,0,1],[1,1,1],[1,0,1],[1,0,1],[1,0,1]],
-            'O': [[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
-            'P': [[1,1,0],[1,0,1],[1,1,0],[1,0,0],[1,0,0]],
-            'R': [[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
-            'S': [[0,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]],
-            'T': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
-            'U': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
-            'V': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
-            'W': [[1,0,1],[1,0,1],[1,0,1],[1,1,1],[1,0,1]],
-            'X': [[1,0,1],[1,0,1],[0,1,0],[1,0,1],[1,0,1]],
-            'Y': [[1,0,1],[1,0,1],[0,1,0],[0,1,0],[0,1,0]],
-            ' ': [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
-            '[': [[1,1,0],[1,0,0],[1,0,0],[1,0,0],[1,1,0]],
-            ']': [[0,1,1],[0,0,1],[0,0,1],[0,0,1],[0,1,1]],
-        }
-
-        text_upper = text.upper()
-        x_offset = 0
-
-        for char in text_upper[:6]:
-            if char in font_3x5:
-                glyph = font_3x5[char]
-                for dy, row in enumerate(glyph):
-                    for dx, pixel in enumerate(row):
-                        x = x_offset + dx
-                        y = 2 + dy
-                        if pixel and 0 <= x < self.width and 0 <= y < self.height:
-                            self.unicorn.set_pixel(x, y, r, g, b)
-                x_offset += 4
 
     def _on_button_pin(self, pin) -> None:
         """Handle button press from unicorn mock."""
@@ -135,7 +102,7 @@ class SparkDisplay(Display):
         if HAS_UNICORN:
             try:
                 self.hat = UnicornHATMini()
-                self.hat.set_brightness(0.5)
+                self.hat.set_brightness(get_spark_brightness())
                 self.mock = None
                 self.width = 17
                 self.height = 7
@@ -195,55 +162,9 @@ class SparkDisplay(Display):
         text = state.candidate
         if state.mode == "engine" and state.engine:
             text = f"[{state.engine['operator'].upper()}]"
-        self._render_text_hw(text, r, g, b)
+        draw_text(self.hat.set_pixel, text, r, g, b)
 
         self.hat.show()
-
-    def _render_text_hw(self, text: str, r: int, g: int, b: int) -> None:
-        """Render text on real hardware (same 3x5 font)."""
-        # ponytail: duplicated font dict from SparkMock — extract if a 3rd consumer appears
-        font_3x5 = {
-            'A': [[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
-            'B': [[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,1,0]],
-            'C': [[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],
-            'D': [[1,1,0],[1,0,1],[1,0,1],[1,0,1],[1,1,0]],
-            'E': [[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,1,1]],
-            'F': [[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,0,0]],
-            'G': [[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],
-            'H': [[1,0,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
-            'I': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],
-            'J': [[0,0,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
-            'K': [[1,0,1],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
-            'L': [[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],
-            'M': [[1,0,1],[1,1,1],[1,0,1],[1,0,1],[1,0,1]],
-            'N': [[1,0,1],[1,1,1],[1,0,1],[1,0,1],[1,0,1]],
-            'O': [[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
-            'P': [[1,1,0],[1,0,1],[1,1,0],[1,0,0],[1,0,0]],
-            'R': [[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
-            'S': [[0,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]],
-            'T': [[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
-            'U': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
-            'V': [[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
-            'W': [[1,0,1],[1,0,1],[1,0,1],[1,1,1],[1,0,1]],
-            'X': [[1,0,1],[1,0,1],[0,1,0],[1,0,1],[1,0,1]],
-            'Y': [[1,0,1],[1,0,1],[0,1,0],[0,1,0],[0,1,0]],
-            ' ': [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
-            '[': [[1,1,0],[1,0,0],[1,0,0],[1,0,0],[1,1,0]],
-            ']': [[0,1,1],[0,0,1],[0,0,1],[0,0,1],[0,1,1]],
-        }
-
-        text_upper = text.upper()
-        x_offset = 0
-        for char in text_upper[:6]:
-            if char in font_3x5:
-                glyph = font_3x5[char]
-                for dy, row in enumerate(glyph):
-                    for dx, pixel in enumerate(row):
-                        x = x_offset + dx
-                        y = 2 + dy
-                        if pixel and 0 <= x < self.width and 0 <= y < self.height:
-                            self.hat.set_pixel(x, y, r, g, b)
-                x_offset += 4
 
     def close(self) -> None:
         """Clean up display."""
