@@ -9,14 +9,20 @@ Two things have changed since the official instructions were written:
 1. **System-wide `pip` is blocked (PEP 668).** `sudo pip3 install unicornhatmini`
    now fails with `externally-managed-environment`. The library must be
    installed into a Python virtual environment instead.
-2. **`RPi.GPIO` is now the `rpi-lgpio` shim.** It requests pins from the kernel
-   rather than writing to hardware registers, and the kernel only lets one
-   owner claim a pin. The Unicorn HAT Mini library drives the two SPI
-   chip-select lines (BCM 8 / CE0 and BCM 7 / CE1) itself, but the ordinary
-   `dtparam=spi=on` setting makes the kernel's SPI driver claim those pins
-   first — so the library crashes with `lgpio.error: 'GPIO busy'`.
-   The fix is to enable SPI with the `spi0-0cs` overlay ("SPI0, zero chip
-   selects"), which provides `/dev/spidev0.0` but leaves BCM 7/8 free.
+2. **`RPi.GPIO` is now the `rpi-lgpio` shim**, which requests pins from the
+   kernel instead of writing to hardware registers, and the kernel only lets
+   one owner claim each pin. This matters because the library needs three
+   things at once: `/dev/spidev0.0` (left LED driver), `/dev/spidev0.1`
+   (right LED driver), and **free** BCM 8 (CE0) and BCM 7 (CE1), because it
+   opens both spidev devices with `no_cs=True` and toggles the chip-select
+   lines itself via `RPi.GPIO`.
+   - The ordinary `dtparam=spi=on` provides both spidev nodes but the kernel
+     claims BCM 7/8 as its chip selects → `lgpio.error: 'GPIO busy'`.
+   - The commonly suggested `dtoverlay=spi0-0cs` frees the pins but only
+     creates `/dev/spidev0.0` → `FileNotFoundError` opening `SpiDev(0, 1)`.
+   - The fix that satisfies all three is `spi0-2cs` with the kernel's
+     chip selects **relocated to spare pins**:
+     `dtoverlay=spi0-2cs,cs0_pin=27,cs1_pin=22`
 
 ## Quick install
 
@@ -62,16 +68,30 @@ pip install unicornhatmini
 `RPi.GPIO` shim. The package is `unicornhatmini` — `unicornhathd` is a
 different product (Unicorn HAT HD) and will not drive this board.
 
-### 3. Enable SPI via the spi0-0cs overlay
+### 3. Enable SPI with relocated chip selects
 
 Do **not** use `sudo raspi-config nonint do_spi 0` on its own — that writes
-`dtparam=spi=on`, which causes the `'GPIO busy'` error described above.
-Instead edit `/boot/firmware/config.txt`:
+`dtparam=spi=on`, which causes the `'GPIO busy'` error described above. And do
+**not** use `dtoverlay=spi0-0cs` — that removes `/dev/spidev0.1`, which this
+board needs. Instead edit `/boot/firmware/config.txt`:
 
 ```bash
 sudo sed -i 's/^dtparam=spi=on/#dtparam=spi=on/' /boot/firmware/config.txt
-printf '\n[all]\ndtoverlay=spi0-0cs\n' | sudo tee -a /boot/firmware/config.txt
+printf '\n[all]\ndtoverlay=spi0-2cs,cs0_pin=27,cs1_pin=22\n' | sudo tee -a /boot/firmware/config.txt
 sudo reboot
+```
+
+This enables SPI0 with both spidev device nodes, but parks the kernel's two
+chip-select lines on GPIO 27 and 22 instead of 8 and 7. The library sets
+`no_cs`, so the kernel never actually toggles them — they just need to point
+somewhere that isn't BCM 7/8. GPIO 27 and 22 do get *claimed* at boot, though,
+so if you need those pins for something else, substitute any other two free
+GPIOs (avoid 8/7/9/10/11 and the HAT's buttons on 5, 6, 16 and 24).
+
+After rebooting, verify:
+
+```bash
+ls /dev/spidev*        # should list /dev/spidev0.0 AND /dev/spidev0.1
 ```
 
 ### 4. Run an example
@@ -115,16 +135,19 @@ virtual environment (or with `sudo`). Activate the venv first.
 isn't activated in this shell, or you installed `unicornhathd` (wrong board)
 instead of `unicornhatmini`.
 
-**`lgpio.error: 'GPIO busy'`** — the kernel SPI driver still owns the
-chip-select pins. Check `/boot/firmware/config.txt`: `dtparam=spi=on` must be
-commented out, `dtoverlay=spi0-0cs` must be present, and you must reboot after
-changing it. You can verify with `sudo apt install gpiod` and
-`gpioinfo | grep -E 'GPIO[78]"'` — the pins should show as `unused`, not
-`"spi0 CS0"` / `"spi0 CS1"`.
+**`lgpio.error: 'GPIO busy'`** — the kernel still owns BCM 7/8 (usually because
+`dtparam=spi=on` is active, which claims them as `spi0 CS0`/`CS1`). Comment it
+out, use the `spi0-2cs` overlay from step 3, and reboot. To inspect ownership:
+`sudo apt install gpiod` then `gpioinfo | grep -E 'GPIO[78]"'` — both pins
+should show as `unused`.
 
-**`FileNotFoundError: /dev/spidev0.0`** — SPI isn't enabled at all. Make sure
-`dtoverlay=spi0-0cs` is in `/boot/firmware/config.txt` and reboot;
-`ls /dev/spidev*` should then list `/dev/spidev0.0`.
+**`FileNotFoundError` at `spidev.SpiDev(0, 1)`** — `/dev/spidev0.1` doesn't
+exist. This is what you get with `dtoverlay=spi0-0cs`, which only creates
+`spidev0.0`. Switch to the `spi0-2cs` line from step 3 and reboot.
+
+**`FileNotFoundError` at `spidev.SpiDev(0, 0)`** — SPI isn't enabled at all.
+Add the overlay from step 3 and reboot; `ls /dev/spidev*` should then list
+both nodes.
 
 **Display works but buttons don't** — the four buttons are on BCM 5, 6, 16
 and 24 and use the same `RPi.GPIO` shim; make sure nothing else has claimed
